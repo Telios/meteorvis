@@ -4,11 +4,11 @@ import {SpaceObject} from './entities/spaceObject.js';
 
 
 const config = {
-    locateFile: filename => `/dist/${filename}`
+    locateFile: filename => `/js/${filename}`
 }
 
 const sqlPromise = initSqlJs({
-    locateFile: file => `/dist/${file}`
+    locateFile: file => `/js/${file}`
 });
 const dataPromise = fetch("/data/data.db").then(res => res.arrayBuffer());
 const [SQL, buf] = await Promise.all([sqlPromise, dataPromise])
