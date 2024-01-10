@@ -4,13 +4,13 @@ import {SpaceObject} from './entities/spaceObject.js';
 
 
 const config = {
-    locateFile: filename => `/js/${filename}`
+    locateFile: filename => `./js/${filename}`
 }
 
 const sqlPromise = initSqlJs({
-    locateFile: file => `/js/${file}`
+    locateFile: file => `./js/${file}`
 });
-const dataPromise = fetch("/data/data.db").then(res => res.arrayBuffer());
+const dataPromise = fetch("./data/data.db").then(res => res.arrayBuffer());
 const [SQL, buf] = await Promise.all([sqlPromise, dataPromise])
 const db = new SQL.Database(new Uint8Array(buf));
 
@@ -74,7 +74,7 @@ function main() {
 
     const keplerParticles = new Spacekit.KeplerParticles({
         maxNumParticles: 200000,
-        textureUrl: 'data/meteor_texture.png',
+        textureUrl: './data/meteor_texture.png',
         defaultSize: 2,
     }, viz)
 
