@@ -1,24 +1,17 @@
 export class SpaceObject{
-    constructor(spkid, full_name, diameter, epoch, e, a, q, i, om, w, ma, ad, n, tp, per, per_y, obj_class, pha, orbit_id) {
-        this.spkid = spkid;
+    constructor(full_name, diameter, epoch, e, a, i, ma, om, w, pha, orbit_id, tp) {
         this.full_name = full_name;
         this.diameter = diameter;
         this.epoch = epoch;
         this.e = e;
         this.a = a;
-        this.q = q;
         this.i = i;
+        this.ma = ma;
         this.om = om;
         this.w = w;
-        this.ma = ma;
-        this.ad = ad;
-        this.n = n;
-        this.tp = tp;
-        this.per = per;
-        this.per_y = per_y;
-        this.obj_class = obj_class;
         this.pha = pha;
         this.orbit_id = orbit_id;
+        this.tp = tp;
     }
 
     get Ephemeris() {
@@ -30,6 +23,7 @@ export class SpaceObject{
             om: this.om,
             w: this.w,
             ma: this.ma,
+            tp: this.tp,
         })
     }
 }

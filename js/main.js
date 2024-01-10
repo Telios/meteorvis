@@ -2,6 +2,7 @@
 const THREE = Spacekit.THREE;
 import {SpaceObject} from './entities/spaceObject.js';
 
+
 const config = {
     locateFile: filename => `/dist/${filename}`
 }
@@ -9,15 +10,16 @@ const config = {
 const sqlPromise = initSqlJs({
     locateFile: file => `/dist/${file}`
 });
-const dataPromise = fetch("/data/database.db").then(res => res.arrayBuffer());
+const dataPromise = fetch("/data/data.db").then(res => res.arrayBuffer());
 const [SQL, buf] = await Promise.all([sqlPromise, dataPromise])
 const db = new SQL.Database(new Uint8Array(buf));
 
 const query = `SELECT * FROM data`;
 const res = db.exec(query);
-console.log(res);
+
 let counter = 0
 let spaceObjects = [];
+console.log(res)
 res[0].values.forEach(row => {
     counter++;
     let spaceObject = new SpaceObject(...row);
@@ -74,15 +76,12 @@ function main() {
         maxNumParticles: 200000,
         textureUrl: 'data/meteor_texture.png',
         defaultSize: 2,
-
     }, viz)
 
-    let offset = 1000000;
-    let particleCount = 1e5 + offset;
-    console.log("loading " + particleCount + " particles... prepare to destroy your computer");
-    for (let i = offset; i < particleCount; i++) {
-        keplerParticles.addParticle(spaceObjects[i].Ephemeris);
-    }
+    console.log("loading particles... prepare to destroy your computer");
+    spaceObjects.forEach((spaceObject, i) => {
+        keplerParticles.addParticle(spaceObject.Ephemeris);
+    });
 
 
     //console.log("roadster", roadster);
