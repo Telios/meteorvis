@@ -1,12 +1,51 @@
 //import * as THREE from 'three';
 const THREE = Spacekit.THREE;
+import {SpaceObject} from './entities/spaceObject.js';
+
+
+const config = {
+    locateFile: filename => `./js/${filename}`
+}
+
+const sqlPromise = initSqlJs({
+    locateFile: file => `./js/${file}`
+});
+const dataPromise = fetch("./data/data.db").then(res => res.arrayBuffer());
+const [SQL, buf] = await Promise.all([sqlPromise, dataPromise])
+const db = new SQL.Database(new Uint8Array(buf));
+
+const query = `SELECT * FROM data`;
+const res = db.exec(query);
+
+let counter = 0
+let spaceObjects = [];
+console.log(res)
+res[0].values.forEach(row => {
+    counter++;
+    let spaceObject = new SpaceObject(...row);
+    if (counter == 1) {
+        console.log(spaceObject)
+    }
+    spaceObjects.push(spaceObject);
+});
+
+console.log(spaceObjects);
+/*
+async function loadJSON(url) {
+    const response = await fetch(url);
+    return await response.json();
+}
+const data = await loadJSON("data/data3.json");
+console.log(data);
+*/
 
 function main() {
+
     const viz = new Spacekit.Simulation(document.getElementById("mainContainer"), {
         basePath: 'https://typpo.github.io/spacekit/src',
         debug: {
-            showAxes: true,
-            showGrid: true,
+            showAxes: false,
+            showGrid: false,
             showStats: true,
         },
     });
@@ -28,28 +67,27 @@ function main() {
     const saturn = viz.createObject('saturn', Spacekit.SpaceObjectPresets.SATURN);
     const uranus = viz.createObject('uranus', Spacekit.SpaceObjectPresets.URANUS);
     const neptune = viz.createObject('neptune', Spacekit.SpaceObjectPresets.NEPTUNE);
+    //const skybox = viz.createStars({minSize /* optional */: 3 /* default */});
 
-    const roadster = viz.createSphere('roadster', {
-        labelText: 'Tesla Roadster',
-        ephem: new Spacekit.Ephem({
-            // These parameters define orbit shape.
-            a: 1.324870564730606E+00,
-            e: 2.557785995665682E-01,
-            i: 1.077550722804860E+00,
+    //const skybox = viz.createSkybox(Spacekit.SkyboxPresets.NASA_TYCHO);
 
-            // These parameters define the orientation of the orbit.
-            om: 3.170946964325638E+02,
-            w: 1.774865822248395E+02,
-            ma: 1.764302192487955E+02,
 
-            // Where the object is in its orbit.
-            epoch: 2458426.500000000,
-        }, 'deg'),
-        radius: 0.05,
+    const keplerParticles = new Spacekit.KeplerParticles({
+        maxNumParticles: 200000,
+        textureUrl: './data/meteor_texture.png',
+        defaultSize: 2,
+    }, viz)
+
+    console.log("loading particles... prepare to destroy your computer");
+    spaceObjects.forEach((spaceObject, i) => {
+        keplerParticles.addParticle(spaceObject.Ephemeris);
     });
-    console.log("roadster", roadster);
-    console.log("roadster THREE.js objects", roadster.get3jsObjects());
 
+
+    //console.log("roadster", roadster);
+    //console.log("roadster THREE.js objects", roadster.get3jsObjects());
+
+    /*
     const objects = [sun, mercury, venus, earth, mars, jupiter, saturn, uranus, neptune, roadster];
     let boundingObjects =
         Promise.all(objects.map(object => object.getBoundingObject()))
@@ -81,6 +119,7 @@ function main() {
         },
     });*/
 
+    /*
     const camera = viz.getViewer().camera;
     const raycaster = new THREE.Raycaster();
 
@@ -114,6 +153,7 @@ function main() {
 
 
     document.getElementById("mainContainer").onclick = onClick;
+    */
 }
 
 main();
