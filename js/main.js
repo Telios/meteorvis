@@ -40,9 +40,10 @@ console.log(data);
 */
 
 function main() {
-
     const viz = new Spacekit.Simulation(document.getElementById("mainContainer"), {
         basePath: 'https://typpo.github.io/spacekit/src',
+        startPaused: true,
+        jdPerSecond: 10.0,
         debug: {
             showAxes: false,
             showGrid: false,
@@ -50,7 +51,51 @@ function main() {
         },
     });
 
+    let vizPaused = true;
+    function toggleSimulationPause() {
+        vizPaused = !vizPaused;
+        const pauseButton = document.getElementById("pauseButton");
+        const pauseButtonIcon = pauseButton.querySelector(".bi");
+        if (vizPaused) {
+            viz.stop();
+            pauseButtonIcon.classList.remove("bi-pause-fill");
+            pauseButtonIcon.classList.add("bi-play-fill");
+
+        } else {
+            viz.start();
+            pauseButtonIcon.classList.remove("bi-play-fill");
+            pauseButtonIcon.classList.add("bi-pause-fill");
+        }
+
+    }
+    document.getElementById("pauseButton").addEventListener("click", toggleSimulationPause);
+    document.getElementById("incrSpeedButton").addEventListener("click", () => {
+        viz.setJdPerSecond(viz.getJdPerSecond() + 1);
+    });
+    document.getElementById("decrSpeedButton").addEventListener("click", () => {
+        viz.setJdPerSecond(viz.getJdPerSecond() - 1);
+    });
+
+
+    function updateTimeDisplay() {
+        // duration of a gregorian day is the same as julian day, can just use jd per seconds
+        const speedDisplay = document.getElementById("timeDisplayDaysPerSecond");
+        speedDisplay.innerHTML = viz.getJdPerSecond();
+
+        const timeDisplayJd = document.getElementById("timeDisplayJd");
+        timeDisplayJd.innerHTML = viz.getJd().toFixed(4);
+
+        const timeDisplayGregorian = document.getElementById("timeDisplayGregorian");
+        let date = viz.getDate();
+        timeDisplayGregorian.innerHTML = date.getUTCFullYear()
+            + "-" + String(date.getUTCMonth() + 1).padStart(2, "0")
+            + "-" + String(date.getUTCDate()).padStart(2, "0");
+    }
+
     //viz.stop();
+    viz.onTick = () => {
+        updateTimeDisplay();
+    };
 
     // Create a background using Yale Bright Star Catalog data.
     //viz.createStars();
