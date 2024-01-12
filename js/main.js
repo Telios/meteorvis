@@ -44,6 +44,9 @@ function main() {
         basePath: 'https://typpo.github.io/spacekit/src',
         startPaused: true,
         jdPerSecond: 10.0,
+        maxNumParticles: 2000000,
+        particleDefaultSize: 2,
+        particleTextureUrl: './data/meteor_texture.png',
         debug: {
             showAxes: false,
             showGrid: false,
@@ -116,18 +119,19 @@ function main() {
 
     //const skybox = viz.createSkybox(Spacekit.SkyboxPresets.NASA_TYCHO);
 
-
-    const keplerParticles = new Spacekit.KeplerParticles({
-        maxNumParticles: 200000,
-        textureUrl: './data/meteor_texture.png',
-        defaultSize: 2,
-    }, viz)
-
-    console.log("loading particles... prepare to destroy your computer");
+    console.log("Adding particles to simulation...");
+    const startTime = performance.now();
     spaceObjects.forEach((spaceObject, i) => {
-        keplerParticles.addParticle(spaceObject.Ephemeris);
+        // Simulation uses particle system for rendering per default
+        viz.createObject("obj-" + i, {
+            ephem: spaceObject.Ephemeris,
+            hideOrbit: true, //disabling this leads to very long runtimes, probably samples every orbit on CPU
+            theme: {
+                color: 0xFFFFFF
+            }
+        });
     });
-
+    console.log("...took " + ((performance.now() - startTime) / 1000).toFixed(3) + "ms");
 
     //console.log("roadster", roadster);
     //console.log("roadster THREE.js objects", roadster.get3jsObjects());
