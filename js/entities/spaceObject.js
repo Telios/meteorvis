@@ -1,17 +1,29 @@
 export class SpaceObject{
-    constructor(full_name, diameter, epoch, e, a, i, ma, om, w, pha, orbit_id, tp) {
-        this.full_name = full_name;
-        this.diameter = diameter;
-        this.epoch = epoch;
-        this.e = e;
-        this.a = a;
-        this.i = i;
-        this.ma = ma;
-        this.om = om;
-        this.w = w;
-        this.pha = pha;
-        this.orbit_id = orbit_id;
-        this.tp = tp;
+    constructor(full_name, diameter, epoch, e, a, i, ma, om, w, pha, orbit_id, tp, q, neo, n, ad, GM, BV, UB, IR, H, G, condition_code, orbit_class) {
+        this.full_name = full_name; // name
+        this.diameter = diameter; // object diameter (sphere model) in km
+        this.epoch = epoch; // epoch of osculation in JD (Julian Day)
+        this.e = e; // eccentricity
+        this.a = a; // semi-major axis in AU
+        this.i = i; // inclination in deg
+        this.ma = ma; // mean anomaly at epoch in deg
+        this.om = om; // longitude of the ascending node in deg
+        this.w = w; // argument of perihelion in deg
+        this.pha = pha; // Potentially Hazardous Asteroid (PHA) flag
+        this.orbit_id = orbit_id; // orbit ID
+        this.tp = tp; // time of perihelion passage in TDB
+        this.q = q; // perihelion distance in AU
+        this.neo = neo; // Near-Earth Object (NEO) flag
+        this.n = n; // mean motion in deg/d
+        this.ad = ad; // aphelion distance in AU
+        this.GM = GM; // standard gravitational parameter in km^3/s^2
+        this.BV = BV; // color index B-V in mag
+        this.UB = UB; // color index U-B in mag
+        this.IR = IR; // color index I-R in mag
+        this.H = H; // absolute magnitude
+        this.G = G; // magnitude slope parameter
+        this.condition_code = condition_code; // orbit condition code MPC U parameter
+        this.orbit_class = orbit_class; // orbit class
     }
 
     get Ephemeris() {
@@ -24,6 +36,21 @@ export class SpaceObject{
             w: this.w,
             ma: this.ma,
             tp: this.tp,
-        })
+        }, 'deg');
+    }
+
+    isPHA() {
+        return this.pha === "Y";
+    }
+
+    isNEO() {
+        return this.neo === "Y";
+    }
+}
+
+export class Entry{
+    constructor(vizObj, spaceObject) {
+        this.vizObj = vizObj;
+        this.spaceObject = spaceObject;
     }
 }
