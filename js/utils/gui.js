@@ -65,4 +65,28 @@ export class GUI {
         this.minSpeed = value;
     }
 
+    infoPanel() {
+        return jsPanel.create({
+            theme: {
+                bgPanel: '#fff',
+                colorHeader: '#2c2c2c',
+                bgContent: '#2c2c2c',
+                colorContent: '#fff',
+            },
+            headerTitle: 'Info',
+            panelSize: {
+                width: () => { return window.innerWidth * 0.17 },
+                height: () => { return window.innerHeight * 0.7 }
+            },
+            dragit: {
+                snap: true,
+                opacity: 0.3,
+            },
+            syncMargins: true,
+            borderRadius: '.8rem',
+            position: "left-center",
+        });
+    }
+
+
 }

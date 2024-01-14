@@ -49,7 +49,7 @@ export class SpaceObject{
         return this.neo === "Y";
     }
 
-    get meanVelocity() {
+    meanVelocity() {
         const semi_major_axis = this.a
         const semi_minor_axis = this.a * Math.sqrt(1 - this.e * this.e)
         const h = Math.pow(semi_major_axis - semi_minor_axis, 2) / Math.pow(semi_major_axis + semi_minor_axis, 2)
@@ -58,6 +58,7 @@ export class SpaceObject{
         const per_s = this.per_d * 24 * 60 * 60
         return orbit_length_km / per_s;
     }
+
 }
 
 export class Entry{

@@ -26,10 +26,7 @@ function main() {
     });
 
     gui.speedController.onChange((value) => { viz.setJdPerSecond(value); });
-
-
-
-
+    const infoPanel = gui.infoPanel();
 
     let vizPaused = true;
 
@@ -110,7 +107,8 @@ function main() {
     //});
     //console.log(asteroids)
 
-    const visService = new VisService(db);
+    const visService = new VisService(db, infoPanel);
+    visService.updateInfoPanel();
     console.log(db.spaceObjects[0])
     db.spaceObjects.forEach((spaceObject, i) => {
         const obj = viz.createObject('asteroid' + i, {
