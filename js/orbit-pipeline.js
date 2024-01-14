@@ -14,7 +14,6 @@ struct Orbit {
     M: f32,
     q: f32,
     a0: f32,
-    
 };
 
 @group(0) @binding(0)
@@ -23,6 +22,8 @@ var<storage, read> orbits: array<Orbit>;
 @group(0) @binding(1)
 var<storage, read_write> output: array<vec3<f32>>;
 
+@group(0) @binding(2)
+var<storage, read> m_or_a0: array<f32>;
 
 /**
  * Math helper functions, cosh, tanh and sinh are built-in functions in wgsl
@@ -58,7 +59,7 @@ fn cbrt(x: f32) -> f32 {
 
 fn getPosNearParabolic(global_id: u32) -> vec3<f32> {
     let orbit = orbits[global_id];
-    let a0 = orbit.a0;
+    let a0 = m_or_a0[global_id];
     let e = orbit.e;
     let q = orbit.q;
     let i = orbit.i;
@@ -95,7 +96,7 @@ fn getPosNearParabolic(global_id: u32) -> vec3<f32> {
 
 fn getPosHyperbolic(global_id: u32) -> vec3<f32> {
     let orbit = orbits[global_id];
-    let M = orbit.M;
+    let M = m_or_a0[global_id];
     let e = orbit.e;
     let a = orbit.a;
     let i = orbit.i;
@@ -132,7 +133,7 @@ fn getPosEllipsoid(global_id: u32) -> vec3<f32> {
     let i = orbit.i;
     let om = orbit.om;
     let wBar = orbit.wBar;
-    let M = orbit.M;
+    let M = m_or_a0[global_id];
     let e = orbit.e;
     let a = orbit.a;
     
@@ -186,8 +187,6 @@ fn main(
     return;
   }
 
-  //output[global_id.x] = vec3(0.0, 1.0, 2.0);
-  //output[global_id.x] = vec3(orbit.a, orbit.a, orbit.a);
   output[global_id.x] = getPos(global_id.x);
 }`;
 }
@@ -206,13 +205,18 @@ export class OrbitPipeline {
     inputBuffer = undefined;
     outputBuffer = undefined;
     outputStagingBuffer = undefined;
+    mOrA0Buffer = undefined;
 
     pipeline = undefined;
 
+    ephems = [];
     orbits = [];
+    mOrA0Data = [];
 
     constructor(computeContext) {
         this.computeContext = computeContext;
+        console.log("max uniform buffer size: ", this.computeContext.device.limits.maxUniformBufferBindingSize);
+        console.log("max storage buffer size: ", this.computeContext.device.limits.maxStorageBufferBindingSize);
     }
 
     async init() {
@@ -238,20 +242,43 @@ export class OrbitPipeline {
             size: OrbitPipeline.MAX_ORBIT_OUTPUT_BUFFER_SIZE,
             usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST,
         });
+        this.mOrA0Buffer = this.computeContext.device.createBuffer({
+            label: "array for a0 or m",
+            size: OrbitPipeline.MAX_NUM_ORBITS * 4, //4 bytes per float
+            usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
+        });
+        this.mOrA0Data = new Float32Array(OrbitPipeline.MAX_NUM_ORBITS).fill(0);
+        this.updateMOrA0Buffer();
     }
 
     async initPipeline() {
         const orbitPipelineBindingToBufferInfo = {
             0: {type: "read-only-storage", buffer: this.inputBuffer},
             1: {type: "storage", buffer: this.outputBuffer},
+            2: {type: "read-only-storage", buffer: this.mOrA0Buffer},
         };
         this.pipeline = this.computeContext.createComputePipeline(orbitPipelineBindingToBufferInfo, getOrbitShaderCode());
     }
 
-    async uploadOrbits(orbits) {
-        this.orbits = orbits;
+    async uploadOrbits(spaceObjects) {
+        this.ephems = spaceObjects.map(obj => obj.Ephemeris);
+        this.orbits = spaceObjectsToEphemeris(spaceObjects);
         await this.copyOrbitsArrayToStagingBuffer();
         await this.copyOrbitStagingBufferToOrbitInputBuffer();
+    }
+
+    async updateMOrA0(jd) {
+        const ephems = this.ephems;
+        for (let i = 0; i < ephems.length; i++) {
+            const ephem = ephems[i];
+
+            if (Spacekit.Orbit.getOrbitType(ephem) === Spacekit.OrbitType.PARABOLIC) {
+                this.mOrA0Data[i] = getA0(ephem, jd);
+            } else {
+                this.mOrA0Data[i] = getM(ephem, jd);
+            }
+        }
+        this.updateMOrA0Buffer();
     }
 
     async copyOrbitsArrayToStagingBuffer() {
@@ -268,8 +295,8 @@ export class OrbitPipeline {
         );
 
         const stagingBuffer = this.inputStagingBuffer.getMappedRange(0, OrbitPipeline.MAX_ORBIT_INPUT_BUFFER_SIZE);
-        const float32Array = new Float32Array(stagingBuffer);
 
+        const float32Array = new Float32Array(stagingBuffer);
         let bytesPos = 0;
         for (let i = 0; i < orbits.length; i++) {
             const orbit = orbits[i];
@@ -325,6 +352,12 @@ export class OrbitPipeline {
 
         return positionArray;
     }
+
+    updateMOrA0Buffer() {
+        this.computeContext.device.queue.writeBuffer(
+            this.mOrA0Buffer, 0, this.mOrA0Data, 0, this.mOrA0Data.length
+        );
+    }
 }
 
 
@@ -347,7 +380,7 @@ function getM(ephem, jd) {
 export function spaceObjectsToEphemeris(spaceObjects, jd = 123) {
     return spaceObjects.map(spaceObject => spaceObject.Ephemeris)
         .map(ephem => {
-            const result = {
+            return {
                 a: ephem.get("a"),
                 e: ephem.get("e"),
                 i: ephem.get("i", "rad"),
@@ -357,13 +390,6 @@ export function spaceObjectsToEphemeris(spaceObjects, jd = 123) {
                 M: 0,
                 a0: 0,
             };
-
-            if (Spacekit.Orbit.getOrbitType(ephem) === Spacekit.OrbitType.PARABOLIC) {
-                result.a0 = getA0(ephem, jd);
-            } else {
-                result.M = getM(ephem, jd);
-            }
-            return result;
         })
         .slice(0, OrbitPipeline.MAX_NUM_ORBITS);
 }
@@ -380,7 +406,7 @@ export async function testOrbitPipeline(spaceObjects, jd) {
 
     console.log("upload orbit data...");
     const uploadStartTime = performance.now();
-    await orbitTest.uploadOrbits(orbits);
+    await orbitTest.uploadOrbits(spaceObjects);
     await orbitTest.computeContext.device.queue.onSubmittedWorkDone(); //wait until current queue is done
     const uploadEndTime = performance.now();
     console.log("...done in ", (uploadEndTime - uploadStartTime), "ms");
@@ -397,7 +423,7 @@ export async function testOrbitPipeline(spaceObjects, jd) {
     const positions = await orbitTest.readBackOrbitData();
     const downloadEndTime = performance.now();
     console.log("...done in ", (downloadEndTime - downloadStartTime), "ms");
-    console.log("astroid positions: ", positions);
+    console.log("asteroid positions: ", positions);
 
 
 }

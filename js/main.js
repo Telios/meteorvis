@@ -37,60 +37,50 @@ async function main() {
         particleDefaultColor: COLOR_WHITE,
     });
 
-
-    //gui.speedController.onChange((value) => { viz.setJdPerSecond(value); });
-
-
-
-
-
-    let vizPaused = true;
+    gui.speedController.onChange((value) => { engine.setJdPerSecond(value); });
 
     function toggleSimulationPause() {
-        vizPaused = !vizPaused;
         const pauseButton = document.getElementById("pauseButton");
         const pauseButtonIcon = pauseButton.querySelector(".bi");
-        if (vizPaused) {
-            viz.stop();
-            pauseButtonIcon.classList.remove("bi-pause-fill");
-            pauseButtonIcon.classList.add("bi-play-fill");
-
-        } else {
-            viz.start();
+        if (engine.isPaused) {
+            engine.start();
             pauseButtonIcon.classList.remove("bi-play-fill");
             pauseButtonIcon.classList.add("bi-pause-fill");
+        } else {
+            engine.stop();
+            pauseButtonIcon.classList.remove("bi-pause-fill");
+            pauseButtonIcon.classList.add("bi-play-fill");
         }
-
     }
 
     document.getElementById("pauseButton").addEventListener("click", toggleSimulationPause);
     document.getElementById("incrSpeedButton").addEventListener("click", () => {
-        viz.setJdPerSecond(viz.getJdPerSecond() + 1);
+        engine.setJdPerSecond(engine.getJdPerSecond() + 1);
     });
     document.getElementById("decrSpeedButton").addEventListener("click", () => {
-        viz.setJdPerSecond(viz.getJdPerSecond() - 1);
+        engine.setJdPerSecond(engine.getJdPerSecond() - 1);
     });
 
 
     function updateTimeDisplay() {
         // duration of a gregorian day is the same as julian day, can just use jd per seconds
         const speedDisplay = document.getElementById("timeDisplayDaysPerSecond");
-        speedDisplay.innerHTML = viz.getJdPerSecond();
+        speedDisplay.innerHTML = engine.getJdPerSecond();
 
         const timeDisplayJd = document.getElementById("timeDisplayJd");
-        timeDisplayJd.innerHTML = viz.getJd().toFixed(4);
+        timeDisplayJd.innerHTML = engine.getJd().toFixed(4);
 
         const timeDisplayGregorian = document.getElementById("timeDisplayGregorian");
-        let date = viz.getDate();
+        let date = engine.getDate();
         timeDisplayGregorian.innerHTML = date.getUTCFullYear()
             + "-" + String(date.getUTCMonth() + 1).padStart(2, "0")
             + "-" + String(date.getUTCDate()).padStart(2, "0");
     }
 
     //viz.stop();
-    /*viz.onTick = () => {
+    engine.onTick = () => {
         updateTimeDisplay();
-    };*/
+    };
 
 
     // Create a background using Yale Bright Star Catalog data.
@@ -128,8 +118,7 @@ async function main() {
 
     console.log("upload orbit data...");
     const uploadStartTime = performance.now();
-    engine.setOrbits(spaceObjectsToEphemeris(db.spaceObjects), 2460324);
-    await engine.uploadOrbitsToGpu();
+    await engine.setAndUploadSpaceObjects(db.spaceObjects);
     await engine.webGpuContext.device.queue.onSubmittedWorkDone(); //wait until current queue is done
     const uploadEndTime = performance.now();
     console.log("...done in ", (uploadEndTime - uploadStartTime), "ms");

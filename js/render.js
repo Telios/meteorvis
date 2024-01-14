@@ -1,6 +1,7 @@
 import {WebGpuContext} from "./webgpu-context.js";
 import {OrbitPipeline} from "./orbit-pipeline.js";
 import {OrbitControls} from "./orbit-controls.js";
+import * as julian from "./external/julian.js";
 
 import * as THREE from "three";
 
@@ -438,7 +439,13 @@ export class Engine {
     renderPipeline = undefined;
     orbitPipeline = undefined;
 
-    orbits = [];
+    spaceObjects = [];
+
+    jd = Number(julian.toJd(new Date())); //in jd
+    jdPerSecond = 100;
+    isPaused = false;
+
+    onTick = undefined;
 
     constructor(canvasElement) {
         this.canvasElement = canvasElement;
@@ -467,28 +474,92 @@ export class Engine {
     }
 
     async update(deltaTime) {
+
         this.orbitControls.update(deltaTime);
         this.renderPipeline.updateUniforms();
-        await this.orbitPipeline.runOrbitPipeline();
+
+        if (!this.isPaused) {
+
+            this.jd += deltaTime / 1000 * this.jdPerSecond;
+            await this.orbitPipeline.updateMOrA0(this.jd);
+            await this.orbitPipeline.runOrbitPipeline();
+
+            if (this.onTick !== undefined) {
+                this.onTick();
+            }
+
+        }
+
+        //console.log("current jd is ", this.jd);
     }
 
     render() {
-        this.renderPipeline.render(this.orbits.length);
+        this.renderPipeline.render(this.spaceObjects.length);
     }
 
-    async uploadOrbitsToGpu() {
-        await this.orbitPipeline.uploadOrbits(this.orbits); //TODO only upload orbits that changed since last time
+    setSpaceObjects(spaceObjects) {
+        this.spaceObjects = spaceObjects;
     }
 
-    setOrbits(orbits) {
-        this.orbits = orbits;
+    async uploadSpaceObjectsToGpu() {
+        await this.orbitPipeline.uploadOrbits(this.spaceObjects);
     }
 
-    addOrbit(orbit) {
-        this.orbits.push(orbit);
-        return this.orbits.length - 1;
+    async setAndUploadSpaceObjects(spaceObjects) {
+        this.setSpaceObjects(spaceObjects);
+        return this.uploadSpaceObjectsToGpu();
     }
 
+    /**
+     * Starts simulation (i.e. JD advances as time passes)
+     */
+    start() {
+        this.isPaused = false;
+    }
+
+    /**
+     * Stops simulation.
+     */
+    stop() {
+        this.isPaused = true;
+    }
+
+    /**
+     * Sets current simulation time.
+     * @param jd {number} time in julian date
+     */
+    setJd(jd) {
+        this.jd = jd;
+    }
+
+    /**
+     * Returns current simulation time in JD.
+     * @returns {number} time in julian date
+     */
+    getJd() {
+        return this.jd;
+    }
+
+    /**
+     * Sets current simulation speed.
+     * @param jdPerSecond {number} simulation speed in days passing per second, can be fractional
+     */
+    setJdPerSecond(jdPerSecond) {
+        this.jdPerSecond = jdPerSecond;
+    }
+
+    /**
+     * Returns current simulation speed.
+     * @return {number} simulation speed in days passing per second, can be fraction
+     */
+    getJdPerSecond() {
+        return this.jdPerSecond;
+    }
+
+    /**
+     * Starts simulation and rendering.
+     * @returns {Promise<void>}
+     */
     async run() {
 
         //TODO move this somewhere else
@@ -508,6 +579,9 @@ export class Engine {
         let lastTime = 0;
         let lastUpdateTime = 0;
         const renderCall = (time) => {
+
+            requestAnimationFrame(renderCall);
+
             const deltaTime = time - lastTime;
 
             this.update(deltaTime);
@@ -522,12 +596,18 @@ export class Engine {
             framesSinceLastUpdate++;
             lastTime = time;
 
-            requestAnimationFrame(renderCall);
         }
 
-        renderCall();
+        renderCall(0);
     }
 
+    /**
+     * Returns current simulation time as gregorian date.
+     * @returns {Date} current simulation time
+     */
+    getDate() {
+        return julian.convertToDate(this.jd);
+    }
 }
 
 export async function testRender(orbits) {
