@@ -62,8 +62,8 @@ export class SpaceObject{
 }
 
 export class Entry{
-    constructor(vizObj, spaceObject) {
-        this.vizObj = vizObj;
+    constructor(idx, spaceObject) {
+        this.idx = idx;
         this.spaceObject = spaceObject;
     }
 }

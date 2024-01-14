@@ -37,10 +37,17 @@ async function main() {
         particleDefaultColor: COLOR_WHITE,
     });
 
-    gui.speedController.onChange((value) => { viz.setJdPerSecond(value); });
     const infoPanel = gui.infoPanel();
-
+    const visService = new VisService(db, infoPanel, engine);
+    visService.resetAll();
+    visService.updateInfoPanel();
     gui.speedController.onChange((value) => { engine.setJdPerSecond(value); });
+    gui.searchController.onChange((value) => { visService.setNameFilter(value) });
+    gui.hideComplementsController.onChange((value) => { visService.setHideComplementsFilter(value); });
+    gui.asteroidSizeController.onChange((value) => { visService.setParticleSize(value); });
+    gui.objectClassController.onChange((value) => { visService.setObjectClassFilter(value); });
+    gui.minDiameterController.onChange((value) => { visService.setMinimumDiameterFilter(value); });
+    gui.minSpeedController.onChange((value) => { visService.setMinimumSpeedFilter(value); });
 
     function toggleSimulationPause() {
         const pauseButton = document.getElementById("pauseButton");
@@ -129,9 +136,8 @@ async function main() {
 
     setTimeout(() => engine.run(), 0);
 
-    const visService = new VisService(db, infoPanel);
-    visService.updateInfoPanel();
-    console.log(db.spaceObjects[0])
+
+
     //db.spaceObjects.forEach((spaceObject, i) => {
         /*const obj = viz.createObject('asteroid' + i, {
             ephem: spaceObject.Ephemeris,
