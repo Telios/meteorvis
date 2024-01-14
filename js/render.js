@@ -175,7 +175,10 @@ class RenderPipeline {
         this.canvasContext = webGpuContext.canvasContext;
     }
 
-    async init(positionStorageBuffer) {
+    async init(positionStorageBuffer, particlePath, defaultParticleSize, defaultParticleColor) {
+        this.defaultParticleSize = defaultParticleSize;
+        this.defaultParticleColor = defaultParticleColor;
+
         this.camera = new Camera();
         this.camera.position.z = 5;
 
@@ -191,7 +194,7 @@ class RenderPipeline {
         });
 
 
-        await this.initTexture("data/meteor_texture.png");
+        await this.initTexture(particlePath);
         this.initBuffers(positionStorageBuffer);
 
         this.initRenderPipeline();
@@ -354,7 +357,7 @@ class RenderPipeline {
         );
     }
 
-    async initTexture(texturePath = "data/meteor_texture.png") {
+    async initTexture(texturePath) {
 
         const imageLoaded = new Promise((resolve, reject) => {
             const imageElement = new Image();
@@ -428,7 +431,7 @@ class RenderPipeline {
 }
 
 
-class Engine {
+export class Engine {
     canvasElement = undefined;
     webGpuContext = undefined;
 
@@ -437,21 +440,23 @@ class Engine {
 
     orbits = [];
 
-    async init(canvasElement) {
+    constructor(canvasElement) {
+        this.canvasElement = canvasElement;
+    }
 
+    async init(options) {
         this.webGpuContext = new WebGpuContext();
-        await this.webGpuContext.init(canvasElement);
-
-        console.log(this.webGpuContext.device.limits);
+        await this.webGpuContext.init(this.canvasElement);
 
         this.orbitPipeline = new OrbitPipeline(this.webGpuContext);
-        await this.orbitPipeline.init(this.webGpuContext);
+        await this.orbitPipeline.init();
 
         this.renderPipeline = new RenderPipeline(this.webGpuContext);
-        await this.renderPipeline.init(this.orbitPipeline.outputBuffer);
+        await this.renderPipeline.init(this.orbitPipeline.outputBuffer, options.particleTextureUrl,
+            options.particleDefaultSize, options.particleDefaultColor);
 
         this.webGpuContext.addCanvasResizeListener((w, h) => this.onCanvasResize(w, h));
-        this.onCanvasResize(canvasElement.width, canvasElement.height);
+        this.onCanvasResize(this.canvasElement.width, this.canvasElement.height);
     }
 
     onCanvasResize(width, height) {

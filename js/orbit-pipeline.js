@@ -27,6 +27,30 @@ var<storage, read_write> output: array<vec3<f32>>;
 /**
  * Math helper functions, cosh, tanh and sinh are built-in functions in wgsl
  */
+ 
+/*
+// COSH Function (Hyperbolic Cosine)
+fn cosh(val: f32) -> f32 {
+  let tmp = exp(val);
+  let cosH = (tmp + 1.0 / tmp) / 2.0;
+  return cosH;
+}
+
+// TANH Function (Hyperbolic Tangent)
+fn tanh(val: f32) -> f32 {
+  let tmp = exp(val);
+  let tanH = (tmp - 1.0 / tmp) / (tmp + 1.0 / tmp);
+  return tanH;
+}
+
+// SINH Function (Hyperbolic Sine)
+fn sinh(val: f32) -> f32 {
+  let tmp = exp(val);
+  let sinH = (tmp - 1.0 / tmp) / 2.0;
+  return sinH;
+}
+*/
+
 // Cube root helper that assumes param is positive
 fn cbrt(x: f32) -> f32 {
     return exp(log(x) / 3.0);
@@ -277,7 +301,7 @@ export class OrbitPipeline {
     }
 
     async runOrbitPipeline() {
-        this.computeContext.encodeAndSubmitCommands(this.pipeline, 64,
+        this.computeContext.encodeAndSubmitCommands(this.pipeline, Math.ceil(this.orbits.length / 64),
             this.outputBuffer, this.outputStagingBuffer, this.orbits.length * OrbitPipeline.BYTES_PER_ORBIT);
     }
 
@@ -344,11 +368,11 @@ export function spaceObjectsToEphemeris(spaceObjects, jd = 123) {
         .slice(0, OrbitPipeline.MAX_NUM_ORBITS);
 }
 
-export async function testOrbitPipeline(spaceObjects) {
+export async function testOrbitPipeline(spaceObjects, jd) {
     const computeContext = new WebGpuContext();
-    await computeContext.init();
+    await computeContext.init(document.getElementById("mainContainer"));
 
-    const orbits = spaceObjectsToEphemeris(spaceObjects);
+    const orbits = spaceObjectsToEphemeris(spaceObjects, jd);
     console.log("orbits: ", orbits);
 
     const orbitTest = new OrbitPipeline(computeContext);
