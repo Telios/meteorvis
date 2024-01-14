@@ -1,10 +1,16 @@
 //import * as THREE from 'three';
+import {VisService} from "./utils/visService.js";
+import {GUI} from "./utils/gui.js";
+
 const THREE = Spacekit.THREE;
 import {Entry, SpaceObject} from './entities/spaceObject.js';
 import {Database} from './utils/database.js';
 const db = new Database();
 await db.init();
+
 function main() {
+    const gui = new GUI();
+
     const viz = new Spacekit.Simulation(document.getElementById("mainContainer"), {
         basePath: 'https://typpo.github.io/spacekit/src',
         startPaused: true,
@@ -18,6 +24,12 @@ function main() {
             showStats: true,
         },
     });
+
+    gui.speedController.onChange((value) => { viz.setJdPerSecond(value); });
+
+
+
+
 
     let vizPaused = true;
 
@@ -67,6 +79,7 @@ function main() {
         updateTimeDisplay();
     };
 
+
     // Create a background using Yale Bright Star Catalog data.
     //viz.createStars();
 
@@ -97,6 +110,8 @@ function main() {
     //});
     //console.log(asteroids)
 
+    const visService = new VisService(db);
+    console.log(db.spaceObjects[0])
     db.spaceObjects.forEach((spaceObject, i) => {
         const obj = viz.createObject('asteroid' + i, {
             ephem: spaceObject.Ephemeris,
@@ -114,6 +129,7 @@ function main() {
         viz.particles.setParticleColor( 0xFF0000, entry.vizObj._particleIndex);
         viz.particles.setParticleSize(5, entry.vizObj._particleIndex);
     });
+
 
 }
 

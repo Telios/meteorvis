@@ -14,7 +14,7 @@ export class Database{
         const sqlPromise = initSqlJs({
             locateFile: file => `./js/${file}`
         });
-        const dataPromise = fetch("./data/data1.db").then(res => res.arrayBuffer());
+        const dataPromise = fetch("./data/data.db").then(res => res.arrayBuffer());
         const [SQL, buf] = await Promise.all([sqlPromise, dataPromise])
         this.db = new SQL.Database(new Uint8Array(buf));
         this.loadSpaceObjects();
@@ -47,7 +47,7 @@ export class Database{
         return this.spaceObjects.filter(so => so.orbit_class === orbit_class);
     }
 
-    getPHOs() {
+    getPHAs() {
         return this.spaceObjects.filter(so => so.pha === 'Y');
     }
 
