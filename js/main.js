@@ -1,6 +1,8 @@
 //import * as THREE from 'three';
 const THREE = Spacekit.THREE;
 import {SpaceObject} from './entities/spaceObject.js';
+import {testRender} from "./render.js";
+import {spaceObjectsToEphemeris} from "./orbit-pipeline.js";
 
 
 const config = {
@@ -205,4 +207,5 @@ function main() {
     */
 }
 
-main();
+//main();
+await testRender(spaceObjectsToEphemeris(spaceObjects, 300));
