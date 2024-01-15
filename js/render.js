@@ -2,6 +2,7 @@ import {WebGpuContext} from "./webgpu-context.js";
 import {OrbitPipeline} from "./orbit-pipeline.js";
 import {OrbitControls} from "./orbit-controls.js";
 import * as julian from "./external/julian.js";
+import {Camera} from "./camera.js";
 
 import * as THREE from "three";
 
@@ -56,20 +57,26 @@ struct ParticleInfo {
   @location(1) color: vec4f,
 }
 
-struct UniformData {
-  model: mat4x4f,
+struct CameraData {
   view: mat4x4f,
   projection: mat4x4f,
-  
+}
+
+struct UniformData {
+  model: mat4x4f,
+  camera: CameraData,
   canvasResolution: vec2f,
   particleSize: vec2f,
   particleColor: vec4f,
 }
 
 @group(0) @binding(0)
-var<storage, read> positions: array<vec3f>;
+var<uniform> cameraData: CameraData;
 
 @group(0) @binding(1)
+var<storage, read> positions: array<vec3f>;
+
+@group(0) @binding(2)
 var<uniform> uniformData: UniformData;
 
 @vertex
@@ -89,7 +96,7 @@ fn vertex_main(
   );
 
   let pos = points[vertexIndex];
-  let clipPos = uniformData.projection * uniformData.view * vec4f(positions[instanceIndex], 1.0);
+  let clipPos = cameraData.projection * cameraData.view * vec4f(positions[instanceIndex], 1.0);
   let pointPos = vec4f(pos * particleInfo.size / uniformData.canvasResolution, 0, 0);
 
   var output : VertexOut;
@@ -99,8 +106,8 @@ fn vertex_main(
   return output;
 }
 
-@group(0) @binding(2) var s: sampler;
-@group(0) @binding(3) var t: texture_2d<f32>;
+@group(0) @binding(3) var s: sampler;
+@group(0) @binding(4) var t: texture_2d<f32>;
 
 @fragment
 fn fragment_main(vertexOut: VertexOut) -> @location(0) vec4f
@@ -109,49 +116,18 @@ fn fragment_main(vertexOut: VertexOut) -> @location(0) vec4f
 }
 `;
 
-// using three.js math classes and inspired by three.js PerspectiveCamera class
-class Camera {
-    // 3 mat4x4 (16 floats, 4 bytes each) and 2 vec2 (each 2 floats, 4 bytes each)
-    static UNIFORM_BUFFER_SIZE = 16 * 4 * 3
-        + 2 * 2 * 4
-        + 4 * 4; // 1 vec4 (4 floats, 4 bytes each)
-
-    near = 0.01;
-    far = 100;
-    zoom = 1;
-    fov = 40; //in degrees
-    aspect = 1;
-
-    position = new THREE.Vector3(0.0, 0.0, 0.0);
-    rotation = new THREE.Quaternion().identity();
-    projection = new THREE.Matrix4();
-
-    constructor() {
-        this.updateProjectionMatrix();
-    }
-
-    updateProjectionMatrix() {
-        const near = this.near;
-        const top = near * Math.tan(THREE.MathUtils.DEG2RAD * 0.5 * this.fov) / this.zoom;
-        const height = 2 * top;
-        const width = this.aspect * height;
-        const left = -0.5 * width;
-        this.projection.makePerspective(left, left + width, top, top - height, near, this.far, THREE.WebGPUCoordinateSystem);
-    }
-
-    getViewMatrix() {
-        const result = new THREE.Matrix4().makeRotationFromQuaternion(this.rotation);
-        result.setPosition(this.position.x, this.position.y, this.position.z);
-        result.invert(); //TODO very expensive, dont do this (but oh well)
-        return result;
-    }
-
-    getProjectionMatrix() {
-        return this.projection;
-    }
-}
 
 class RenderPipeline {
+
+    static UNIFORM_BUFFER_SIZE_IN_FLOATS = 16 // model: mat4f
+        + 16 // view: mat4f TODO deprecated, remove
+        + 16 // projection: mat4f TODO deprecated, remove
+        + 2 // canvas resolution: vec2f
+        + 2 // particle size: vec2f TODO deprecated (per particle size), remove here and from struct
+        + 4; // particle color: vec2f TODO deprecated (per particle color), remove here and from struct
+
+
+    static UNIFORM_BUFFER_SIZE = RenderPipeline.UNIFORM_BUFFER_SIZE_IN_FLOATS * 4;
 
     webGpuContext = undefined;
 
@@ -159,16 +135,18 @@ class RenderPipeline {
     renderPipeline = undefined;
     renderPassDescriptor = undefined;
 
-    positionStorageBuffer = undefined;
-    uniformBuffer = undefined;
     renderBindGroup = undefined;
 
-    particleInfoVertexBuffer = undefined;
+    positionBuffer = undefined;
+
+    uniformBuffer = undefined;
+    uniformData = undefined;
+
+    particleInfoBuffer = undefined;
+    particleInfoData = undefined;
 
     defaultParticleSize = 20.0;
     defaultParticleColor = [1.0, 1.0, 1.0, 1.0];
-
-    particleInfos = [];
 
     constructor(webGpuContext) {
         this.webGpuContext = webGpuContext;
@@ -180,7 +158,7 @@ class RenderPipeline {
         this.defaultParticleSize = defaultParticleSize;
         this.defaultParticleColor = defaultParticleColor;
 
-        this.camera = new Camera();
+        this.camera = new Camera(this.webGpuContext);
         this.camera.position.z = 5;
 
         this.shaderModule = this.webGpuContext.device.createShaderModule({
@@ -194,7 +172,6 @@ class RenderPipeline {
             format: this.presentationFormat,
         });
 
-
         await this.initTexture(particlePath);
         this.initBuffers(positionStorageBuffer);
 
@@ -203,38 +180,12 @@ class RenderPipeline {
     }
 
     initBuffers(positionStorageBuffer) {
-        this.positionStorageBuffer = positionStorageBuffer;
-        /*const bufferSize = 4 * 4 * CUBE_VERTICES.length; //3 vec3 (4 floats each, each float 4 bytes each)
-        this.positionStorageBuffer = this.computeContext.device.createBuffer({
-            size: bufferSize,
-            usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
-        });
+        this.positionBuffer = positionStorageBuffer;
 
-        const positionData = new Float32Array(bufferSize / 4);
-        positionData.set(CUBE_VERTICES);
-
-        this.computeContext.device.queue.writeBuffer(
-            this.positionStorageBuffer, 0, positionData, 0, positionData.length
-        );*/
-
-        // per orbit 1 size (vec2f, 2 floats a 4 bytes)
-        /*this.sizesVertexBuffer = this.webGpuContext.device.createBuffer({
-            label: "vertex buffer for sizes",
-            size: 4 * 2 * OrbitPipeline.MAX_NUM_ORBITS,
-            usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
-        });
-        this.initSizes();*/
-
-        // per orbit 1 color (vec4f, 4 floats a 4 bytes)
-        /*this.colorsVertexBuffer = this.webGpuContext.device.createBuffer({
-            label: "vertex buffer for colors",
-            size: 4 * 4 * OrbitPipeline.MAX_NUM_ORBITS,
-            usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
-        });
-        this.initColors();*/
+        this.cameraBuffer = this.camera.getBuffer();
 
         // each has size (2 floats a 4 bytes) and color (4 floats a 4 bytes)
-        this.particleInfoVertexBuffer = this.webGpuContext.device.createBuffer({
+        this.particleInfoBuffer = this.webGpuContext.device.createBuffer({
             label: "vertex buffer for particle info",
             size: 6 * 4 * OrbitPipeline.MAX_NUM_ORBITS,
             usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
@@ -242,9 +193,11 @@ class RenderPipeline {
         this.initParticleInfoVertexBuffer();
 
         this.uniformBuffer = this.webGpuContext.device.createBuffer({
-            size: Camera.UNIFORM_BUFFER_SIZE,
+            size: RenderPipeline.UNIFORM_BUFFER_SIZE,
             usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
         });
+        this.uniformData = new Float32Array(RenderPipeline.UNIFORM_BUFFER_SIZE_IN_FLOATS);
+
         this.updateUniforms();
     }
 
@@ -297,10 +250,11 @@ class RenderPipeline {
             label: "render bind group",
             layout: this.renderPipeline.getBindGroupLayout(0),
             entries: [
-                {binding: 0, resource: {buffer: this.positionStorageBuffer}},
-                {binding: 1, resource: {buffer: this.uniformBuffer}},
-                {binding: 2, resource: this.textureSampler},
-                {binding: 3, resource: this.texture.createView()},
+                {binding: 0, resource: {buffer: this.cameraBuffer}},
+                {binding: 1, resource: {buffer: this.positionBuffer}},
+                {binding: 2, resource: {buffer: this.uniformBuffer}},
+                {binding: 3, resource: this.textureSampler},
+                {binding: 4, resource: this.texture.createView()},
             ],
         });
     }
@@ -327,7 +281,7 @@ class RenderPipeline {
         const renderPass = commandEncoder.beginRenderPass(this.renderPassDescriptor);
         renderPass.setPipeline(this.renderPipeline);
         //renderPass.setVertexBuffer(0, this.vertexBuffer);
-        renderPass.setVertexBuffer(0, this.particleInfoVertexBuffer);
+        renderPass.setVertexBuffer(0, this.particleInfoBuffer);
         renderPass.setBindGroup(0, this.renderBindGroup);
         //renderPass.draw(CUBE_VERTICES.length);
         renderPass.draw(6, numInstances);
@@ -338,7 +292,6 @@ class RenderPipeline {
 
     updateUniforms() {
         //TODO move to camera
-        const uniformData = new Float32Array(Camera.UNIFORM_BUFFER_SIZE / 4);
         const modelMatrixOffset = 0;
         const viewMatrixOffset = 16;
         const projectionMatrixOffset = 32;
@@ -346,9 +299,8 @@ class RenderPipeline {
         const particleSizeOffset = 50;
         const particleColorOffset = 52;
 
+        const uniformData = this.uniformData;
         uniformData.set(new THREE.Matrix4().elements, modelMatrixOffset);
-        uniformData.set(this.camera.getViewMatrix().elements, viewMatrixOffset);
-        uniformData.set(this.camera.getProjectionMatrix().elements, projectionMatrixOffset);
         uniformData.set([this.canvasElement.width, this.canvasElement.height], canvasResolutionOffset);
         uniformData.set([this.defaultParticleSize, this.defaultParticleSize], particleSizeOffset);
         uniformData.set(this.defaultParticleColor, particleColorOffset);
@@ -356,6 +308,8 @@ class RenderPipeline {
         this.webGpuContext.device.queue.writeBuffer(
             this.uniformBuffer, 0, uniformData, 0, uniformData.length
         );
+
+        this.camera.update();
     }
 
     async initTexture(texturePath) {
@@ -402,8 +356,8 @@ class RenderPipeline {
      */
     setParticleSize(index, size) {
         const floatIndex = index * 6;
-        this.particleInfos.set([size, size], 6 * index);
-        this.webGpuContext.device.queue.writeBuffer(this.particleInfoVertexBuffer, 4 * floatIndex, this.particleInfos, floatIndex, 2);
+        this.particleInfoData.set([size, size], 6 * index);
+        this.webGpuContext.device.queue.writeBuffer(this.particleInfoBuffer, 4 * floatIndex, this.particleInfoData, floatIndex, 2);
     }
 
     /**
@@ -413,20 +367,20 @@ class RenderPipeline {
      */
     setParticleColor(index, color) {
         const floatIndex = index * 6 + 2;
-        this.particleInfos.set(color, floatIndex);
-        this.webGpuContext.device.queue.writeBuffer(this.particleInfoVertexBuffer, 4 * floatIndex, this.particleInfos, floatIndex, 4);
+        this.particleInfoData.set(color, floatIndex);
+        this.webGpuContext.device.queue.writeBuffer(this.particleInfoBuffer, 4 * floatIndex, this.particleInfoData, floatIndex, 4);
     }
 
     initParticleInfoVertexBuffer() {
-        this.particleInfos = new Float32Array(OrbitPipeline.MAX_NUM_ORBITS * 6).fill(0.5);
+        this.particleInfoData = new Float32Array(OrbitPipeline.MAX_NUM_ORBITS * 6).fill(0.5);
         const defaultParticleSize = this.defaultParticleSize;
         const defaultParticleColor = this.defaultParticleColor;
         for (let index = 0; index < OrbitPipeline.MAX_NUM_ORBITS; index++) {
             const floatIndex = index * 6;
             const sizeAndColor = [defaultParticleSize, defaultParticleSize, ...defaultParticleColor];
-            this.particleInfos.set(sizeAndColor, floatIndex);
+            this.particleInfoData.set(sizeAndColor, floatIndex);
         }
-        this.webGpuContext.device.queue.writeBuffer(this.particleInfoVertexBuffer, 0, this.particleInfos);
+        this.webGpuContext.device.queue.writeBuffer(this.particleInfoBuffer, 0, this.particleInfoData);
     }
 
 }
