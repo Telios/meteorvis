@@ -29,7 +29,7 @@ var<storage, read> m_or_a0: array<f32>;
  * Math helper functions, cosh, tanh and sinh are built-in functions in wgsl
  */
  
-/*
+
 // COSH Function (Hyperbolic Cosine)
 fn cosh(val: f32) -> f32 {
   let tmp = exp(val);
@@ -50,7 +50,7 @@ fn sinh(val: f32) -> f32 {
   let sinH = (tmp - 1.0 / tmp) / 2.0;
   return sinH;
 }
-*/
+
 
 // Cube root helper that assumes param is positive
 fn cbrt(x: f32) -> f32 {

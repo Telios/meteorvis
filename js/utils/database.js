@@ -1,4 +1,4 @@
-import {SpaceObject} from "../entities/spaceObject.js";
+import {Entry, SpaceObject} from "../entities/spaceObject.js";
 export class Database{
     constructor() {
         this.db = null;
@@ -29,38 +29,27 @@ export class Database{
     loadSpaceObjects() {
         const query = `SELECT * FROM data`;
         const res = this.query(query);
-        res.forEach(row => {
+        res.forEach((row, idx) => {
             let spaceObject = new SpaceObject(...row);
             this.spaceObjects.push(spaceObject);
+            this.entries.push(new Entry(idx, spaceObject));
         });
     }
 
-    getSpaceObjectsByName(name) {
-        return this.spaceObjects.filter(so => so.full_name === name);
-    }
-
-    getSpaceObjectsByOrbitId(orbit_id) {
-        return this.spaceObjects.filter(so => so.orbit_id === orbit_id);
-    }
-
-    getSpaceObjectsByOrbitClass(orbit_class) {
-        return this.spaceObjects.filter(so => so.orbit_class === orbit_class);
+    getEntriesByName(name) {
+        return this.entries.filter(entry => entry.spaceObject.full_name.includes(name));
     }
 
     getPHAs() {
-        return this.spaceObjects.filter(so => so.pha === 'Y');
+        return this.entries.filter(entry => entry.spaceObject.pha === 'Y');
     }
 
     getNEOs() {
-        return this.spaceObjects.filter(so => so.neo === 'Y');
-    }
-
-    getEntriesByName(name) {
-        return this.entries.filter(entry => entry.spaceObject.full_name === name);
+        return this.entries.filter(entry => entry.spaceObject.neo === 'Y');
     }
 
     getEntriesByOrbitId(orbit_id) {
-        return this.entries.filter(entry => entry.spaceObject.orbit_id === orbit_ids);
+        return this.entries.filter(entry => entry.spaceObject.orbit_id === orbit_id);
     }
 
     getNEOEntries() {

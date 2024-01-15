@@ -7,25 +7,27 @@ export class GUI {
 
     init() {
         var GuiObject = function() {
-            this['Search by name'] = '';
+            this['Filter by name'] = '';
             this['Object class'] = 'All';
-            this['Particle size'] = 2;
+            this['Particle size'] = 30;
             this['Show orbits'] = false;
             this['Days per second'] = 150.0;
             this['Minimum diameter [km]'] = 0;
             this['Minimum speed [km/s]'] = 0;
+            this['Hide complements'] = false;
         };
         let guiObject = new GuiObject();
         let visOptions = this.gui.addFolder('Visualization');
         let filterOptions = this.gui.addFolder('Filters');
 
         this.objectClassController = filterOptions.add(guiObject, 'Object class', ['PHA', 'NEO', 'All']);
-        this.asteroidSizeController = visOptions.add(guiObject, 'Particle size', 1, 10);
+        this.asteroidSizeController = visOptions.add(guiObject, 'Particle size', 20, 500);
         this.showOrbitsController = visOptions.add(guiObject, 'Show orbits');
         this.minDiameterController = filterOptions.add(guiObject, 'Minimum diameter [km]', 0, 1000);
-        this.minSpeedController = filterOptions.add(guiObject, 'Minimum speed [km/s]', 0, 1000);
-        this.speedController = this.gui.add(guiObject, 'Days per second', 0, 1000);
-        this.searchController = this.gui.add(guiObject, 'Search by name');
+        this.minSpeedController = filterOptions.add(guiObject, 'Minimum speed [km/s]', 0, 50);
+        this.speedController = this.gui.add(guiObject, 'Days per second', -1000, 1000);
+        this.searchController = filterOptions.add(guiObject, 'Filter by name');
+        this.hideComplementsController = filterOptions.add(guiObject, 'Hide complements');
 
         this.searchController.onChange((value) => { this.updateSearch(value); });
         this.objectClassController.onChange((value) => { this.updateObjectClassSelected(value); });
@@ -64,5 +66,29 @@ export class GUI {
     updateMinSpeed(value) {
         this.minSpeed = value;
     }
+
+    infoPanel() {
+        return jsPanel.create({
+            theme: {
+                bgPanel: '#fff',
+                colorHeader: '#2c2c2c',
+                bgContent: '#2c2c2c',
+                colorContent: '#fff',
+            },
+            headerTitle: 'Info',
+            panelSize: {
+                width: () => { return window.innerWidth * 0.17 },
+                height: () => { return window.innerHeight * 0.7 }
+            },
+            dragit: {
+                snap: true,
+                opacity: 0.3,
+            },
+            syncMargins: true,
+            borderRadius: '.8rem',
+            position: "left-center",
+        });
+    }
+
 
 }
