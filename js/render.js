@@ -148,18 +148,17 @@ class RenderPipeline {
     defaultParticleSize = 20.0;
     defaultParticleColor = [1.0, 1.0, 1.0, 1.0];
 
+    shouldUpdateBuffers = true;
+
     constructor(webGpuContext) {
         this.webGpuContext = webGpuContext;
         this.canvasElement = webGpuContext.canvasElement;
         this.canvasContext = webGpuContext.canvasContext;
     }
 
-    async init(positionStorageBuffer, particlePath, defaultParticleSize, defaultParticleColor) {
+    async init(positionBuffer, cameraBuffer, particlePath, defaultParticleSize, defaultParticleColor) {
         this.defaultParticleSize = defaultParticleSize;
         this.defaultParticleColor = defaultParticleColor;
-
-        this.camera = new Camera(this.webGpuContext);
-        this.camera.position.z = 5;
 
         this.shaderModule = this.webGpuContext.device.createShaderModule({
             code: shaders,
@@ -173,16 +172,15 @@ class RenderPipeline {
         });
 
         await this.initTexture(particlePath);
-        this.initBuffers(positionStorageBuffer);
+        this.initBuffers(positionBuffer, cameraBuffer);
 
         this.initRenderPipeline();
         this.initRenderPassDescriptor();
     }
 
-    initBuffers(positionStorageBuffer) {
-        this.positionBuffer = positionStorageBuffer;
-
-        this.cameraBuffer = this.camera.getBuffer();
+    initBuffers(positionBuffer, cameraBuffer) {
+        this.positionBuffer = positionBuffer;
+        this.cameraBuffer = cameraBuffer;
 
         // each has size (2 floats a 4 bytes) and color (4 floats a 4 bytes)
         this.particleInfoBuffer = this.webGpuContext.device.createBuffer({
@@ -198,7 +196,7 @@ class RenderPipeline {
         });
         this.uniformData = new Float32Array(RenderPipeline.UNIFORM_BUFFER_SIZE_IN_FLOATS);
 
-        this.updateUniforms();
+        this.updateBuffers();
     }
 
     initRenderPipeline() {
@@ -275,6 +273,11 @@ class RenderPipeline {
     }
 
     render(numInstances) {
+        if (this.shouldUpdateBuffers) {
+            this.updateBuffers();
+            this.shouldUpdateBuffers = false;
+        }
+
         this.renderPassDescriptor.colorAttachments[0].view = this.canvasContext.getCurrentTexture().createView();
 
         const commandEncoder = this.webGpuContext.device.createCommandEncoder();
@@ -290,11 +293,8 @@ class RenderPipeline {
         this.webGpuContext.device.queue.submit([commandEncoder.finish()]);
     }
 
-    updateUniforms() {
-        //TODO move to camera
+    updateBuffers() {
         const modelMatrixOffset = 0;
-        const viewMatrixOffset = 16;
-        const projectionMatrixOffset = 32;
         const canvasResolutionOffset = 48;
         const particleSizeOffset = 50;
         const particleColorOffset = 52;
@@ -305,13 +305,9 @@ class RenderPipeline {
         uniformData.set([this.defaultParticleSize, this.defaultParticleSize], particleSizeOffset);
         uniformData.set(this.defaultParticleColor, particleColorOffset);
 
-        this.webGpuContext.device.queue.writeBuffer(
-            this.uniformBuffer, 0, uniformData, 0, uniformData.length
-        );
-
-        this.camera.update();
+        this.webGpuContext.device.queue.writeBuffer(this.uniformBuffer, 0, uniformData);
+        this.webGpuContext.device.queue.writeBuffer(this.particleInfoBuffer, 0, this.particleInfoData);
     }
-
     async initTexture(texturePath) {
 
         const imageLoaded = new Promise((resolve, reject) => {
@@ -356,8 +352,9 @@ class RenderPipeline {
      */
     setParticleSize(index, size) {
         const floatIndex = index * 6;
-        this.particleInfoData.set([size, size], 6 * index);
-        this.webGpuContext.device.queue.writeBuffer(this.particleInfoBuffer, 4 * floatIndex, this.particleInfoData, floatIndex, 2);
+        this.particleInfoData.set([size, size], floatIndex);
+        //this.webGpuContext.device.queue.writeBuffer(this.particleInfoBuffer, 4 * floatIndex, this.particleInfoData, floatIndex, 2);
+        this.shouldUpdateBuffers = true;
     }
 
     /**
@@ -368,7 +365,8 @@ class RenderPipeline {
     setParticleColor(index, color) {
         const floatIndex = index * 6 + 2;
         this.particleInfoData.set(color, floatIndex);
-        this.webGpuContext.device.queue.writeBuffer(this.particleInfoBuffer, 4 * floatIndex, this.particleInfoData, floatIndex, 4);
+        //this.webGpuContext.device.queue.writeBuffer(this.particleInfoBuffer, 4 * floatIndex, this.particleInfoData, floatIndex, 4);
+        this.shouldUpdateBuffers = true;
     }
 
     initParticleInfoVertexBuffer() {
@@ -409,28 +407,29 @@ export class Engine {
         this.webGpuContext = new WebGpuContext();
         await this.webGpuContext.init(this.canvasElement);
 
+        this.camera = new Camera(this.webGpuContext);
+        this.camera.position.z = 5;
+
         this.orbitPipeline = new OrbitPipeline(this.webGpuContext);
         await this.orbitPipeline.init();
 
         this.renderPipeline = new RenderPipeline(this.webGpuContext);
-        await this.renderPipeline.init(this.orbitPipeline.outputBuffer, options.particleTextureUrl,
-            options.particleDefaultSize, options.particleDefaultColor);
+        await this.renderPipeline.init(this.orbitPipeline.outputBuffer, this.camera.getBuffer(),
+            options.particleTextureUrl, options.particleDefaultSize, options.particleDefaultColor);
 
         this.webGpuContext.addCanvasResizeListener((w, h) => this.onCanvasResize(w, h));
         this.onCanvasResize(this.canvasElement.width, this.canvasElement.height);
     }
 
     onCanvasResize(width, height) {
-        this.renderPipeline.camera.aspect = width / height;
-        this.renderPipeline.camera.updateProjectionMatrix();
-        this.renderPipeline.updateUniforms();
+        this.camera.aspect = width / height;
+        this.camera.updateProjectionMatrix();
         console.log("canvas resized, new width=", width, ", new height=", height);
     }
 
     async update(deltaTime) {
-
         this.orbitControls.update(deltaTime);
-        this.renderPipeline.updateUniforms();
+        this.camera.update();
 
         if (!this.isPaused) {
 
@@ -448,6 +447,7 @@ export class Engine {
     }
 
     render() {
+
         this.renderPipeline.render(this.spaceObjects.length);
     }
 
@@ -517,7 +517,7 @@ export class Engine {
     async run() {
 
         //TODO move this somewhere else
-        this.orbitControls = new OrbitControls(this.webGpuContext.canvasElement, this.renderPipeline.camera);
+        this.orbitControls = new OrbitControls(this.webGpuContext.canvasElement, this.camera);
 
         //TODO performance display to extra class
         const frameTimeDisplayElement = document.getElementById("perfDisplayFrameTime");
