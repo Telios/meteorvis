@@ -40,11 +40,14 @@ export class Camera {
         this.projection.makePerspective(left, left + width, top, top - height, near, this.far, THREE.WebGPUCoordinateSystem);
     }
 
-    getViewMatrix() {
+    getModelMatrix() {
         const result = new THREE.Matrix4().makeRotationFromQuaternion(this.rotation);
         result.setPosition(this.position.x, this.position.y, this.position.z);
-        result.invert(); //TODO very expensive, dont do this (but oh well)
         return result;
+    }
+
+    getViewMatrix() {
+        return this.getModelMatrix().invert(); //TODO very expensive, dont do this (but oh well)
     }
 
     getProjectionMatrix() {
