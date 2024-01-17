@@ -268,6 +268,7 @@ export class OrbitPipeline {
     }
 
     async updateMOrA0(jd) {
+        const updateMOrA0Start = performance.now();
         const ephems = this.ephems;
         for (let i = 0; i < ephems.length; i++) {
             const ephem = ephems[i];
@@ -278,7 +279,11 @@ export class OrbitPipeline {
                 this.mOrA0Data[i] = getM(ephem, jd);
             }
         }
+        const updateMOrA0CpuEnd = performance.now();
         this.updateMOrA0Buffer();
+        const updateMOrA0End = performance.now();
+        console.log("update M or A0, CPU ", updateMOrA0CpuEnd - updateMOrA0Start,
+            ", GPU", updateMOrA0End - updateMOrA0CpuEnd);
     }
 
     async copyOrbitsArrayToStagingBuffer() {

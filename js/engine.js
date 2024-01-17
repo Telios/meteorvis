@@ -49,6 +49,7 @@ export class Engine {
     }
 
     async update(deltaTime) {
+        const updateStart = performance.now();
         this.orbitControls.update(deltaTime);
         this.camera.update();
 
@@ -63,6 +64,10 @@ export class Engine {
             }
 
         }
+
+        const updateEnd = performance.now();
+        const updateTime = updateEnd - updateStart;
+        console.log("update time", updateTime, "ms");
 
         //console.log("current jd is ", this.jd);
     }
