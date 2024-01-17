@@ -1,7 +1,7 @@
 //import * as THREE from 'three';
 import {VisService} from "./utils/visService.js";
 import {GUI} from "./utils/gui.js";
-import {Engine} from "./render.js"
+import {Engine} from "./engine.js"
 
 const THREE = Spacekit.THREE;
 import {Entry, SpaceObject} from './entities/spaceObject.js';
