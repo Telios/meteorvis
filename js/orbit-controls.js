@@ -1,5 +1,5 @@
 import * as Utility from "./utility.js";
-import {Vector3, Quaternion, Matrix4} from "three";
+import {Vector3, Quaternion, Matrix4, MathUtils, Euler} from "three";
 
 export class OrbitControls {
     dragSensitivity = 0.05;
@@ -44,15 +44,13 @@ export class OrbitControls {
             //this.camera.position.x -= dragFactor * deltaX;
             //this.camera.position.y += dragFactor * deltaY;
         } else {
+            const cameraPosition = new Vector3().setFromMatrixPosition(this.camera.model);
+            console.log("camera pos", cameraPosition);
             const orbitFactor = timeFactor * this.orbitSensitivity;
-            const spherical = Utility.toSpherical(this.orbitCenter, this.camera.position);
-            spherical[1] -= orbitFactor * deltaY;
-            spherical[2] += orbitFactor * deltaX;
-            const cartesian = Utility.toCartesian(this.orbitCenter, spherical[0], spherical[1], spherical[2]);
 
-            this.camera.position.copy(cartesian);
-            const lookAtMatrix = new Matrix4().lookAt(this.camera.position, this.orbitCenter, new Vector3(0, 1, 0));
-            this.camera.rotation.setFromRotationMatrix(lookAtMatrix);
+            const rotation = new Matrix4().makeRotationFromEuler(
+                new Euler(-orbitFactor * deltaY, -orbitFactor * deltaX, 0, "XYZ"));
+            this.camera.model.premultiply(rotation);
         }
 
         this.lastPointerCoords = this.currentPointerCoords;
@@ -91,11 +89,9 @@ export class OrbitControls {
     wheelCallback(event) {
         const deltaY = event.deltaY;
         const scrollDir = Math.sign(deltaY);
-
-        const spherical = Utility.toSpherical(this.orbitCenter, this.camera.position);
-        spherical[0] += scrollDir * this.scrollSensitivity;
-        const cartesian = Utility.toCartesian(this.orbitCenter, spherical[0], spherical[1], spherical[2]);
-
-        this.camera.position.copy(cartesian);
+        const cameraPosition = new Vector3().setFromMatrixPosition(this.camera.getModelMatrix());
+        const cameraToOrbitCenter = new Vector3().subVectors(cameraPosition, this.orbitCenter).normalize();
+        const newCameraPosition = cameraPosition.addScaledVector(cameraToOrbitCenter, scrollDir * this.scrollSensitivity);
+        this.camera.model.setPosition(newCameraPosition);
     }
 }

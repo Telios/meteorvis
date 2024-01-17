@@ -408,7 +408,7 @@ export class Engine {
         await this.webGpuContext.init(this.canvasElement);
 
         this.camera = new Camera(this.webGpuContext);
-        this.camera.position.z = 5;
+        this.camera.model.setPosition(0, 0, 7);
 
         this.orbitPipeline = new OrbitPipeline(this.webGpuContext);
         await this.orbitPipeline.init();

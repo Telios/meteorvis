@@ -21,9 +21,8 @@ export class Camera {
     fov = 40; //in degrees
     aspect = 1;
 
-    position = new THREE.Vector3(0.0, 0.0, 0.0);
-    rotation = new THREE.Quaternion().identity();
     projection = new THREE.Matrix4();
+    model = new THREE.Matrix4().identity();
 
     constructor(webgpuContext) {
         this.updateProjectionMatrix();
@@ -41,13 +40,11 @@ export class Camera {
     }
 
     getModelMatrix() {
-        const result = new THREE.Matrix4().makeRotationFromQuaternion(this.rotation);
-        result.setPosition(this.position.x, this.position.y, this.position.z);
-        return result;
+        return this.model;
     }
 
     getViewMatrix() {
-        return this.getModelMatrix().invert(); //TODO very expensive, dont do this (but oh well)
+        return this.getModelMatrix().clone().invert(); //TODO very expensive, dont do this (but oh well)
     }
 
     getProjectionMatrix() {
