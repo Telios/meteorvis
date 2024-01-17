@@ -12,6 +12,8 @@ export class OrbitControls {
     lastPointerCoords = [];
     currentPointerCoords = [];
 
+    horizontalAngle = 0;
+    verticalAngle = 0;
     orbitCenter = new Vector3(0.0, 0.0, 0.0);
 
     constructor(element, camera) {
@@ -44,13 +46,15 @@ export class OrbitControls {
             //this.camera.position.x -= dragFactor * deltaX;
             //this.camera.position.y += dragFactor * deltaY;
         } else {
-            const cameraPosition = new Vector3().setFromMatrixPosition(this.camera.model);
-            console.log("camera pos", cameraPosition);
             const orbitFactor = timeFactor * this.orbitSensitivity;
+            const cameraPosition = new Vector3().setFromMatrixPosition(this.camera.model);
+            const spherical = Utility.toSpherical(this.orbitCenter, cameraPosition);
+            spherical[1] = Math.max(Math.min(spherical[1] - orbitFactor * deltaY, Math.PI), 0);
+            spherical[2] += orbitFactor * deltaX;
+            const cartesian = Utility.toCartesian(this.orbitCenter, spherical[0], spherical[1], spherical[2]);
 
-            const rotation = new Matrix4().makeRotationFromEuler(
-                new Euler(-orbitFactor * deltaY, -orbitFactor * deltaX, 0, "XYZ"));
-            this.camera.model.premultiply(rotation);
+            this.camera.model.setPosition(cartesian);
+            this.camera.model.lookAt(cartesian, this.orbitCenter, new Vector3(0, 1, 0));
         }
 
         this.lastPointerCoords = this.currentPointerCoords;
