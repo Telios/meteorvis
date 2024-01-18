@@ -5,8 +5,7 @@
 MeteorVis is a web-based client-side interactive 3D visualization of asteroids traversing their orbits over time.
 
 ## How to run
-Open `index.html`.
-That's it.
+Serve root directory of this repository via local webserver. (needed because of CORS) <br>
 Only compatible with Google Chrome, as it currently is the only browser currently supporting webGPU.
 
 Demo is available [here](https://telios.github.io/meteorvis/).<br>
@@ -23,7 +22,7 @@ Calculating the positions in the compute shader enables further GPU-based data a
 ## Technology used
 This framework is largely inspired by [spacekit.js](https://typpo.github.io/spacekit/), which is based on the WebGL framework [THREE.js](https://threejs.org/).
 While spacekit.js provides a rich set of features, its scalability in terms of how many objects it can handle is limited.
-In our tests, it 
+In our tests, our solution outperformed spacekit.js by a factor of 5.
 
 Packages we also used were
  - [THREE.js](https://threejs.org/) for math (classes Vector3, Matrix4, Quaternion)
