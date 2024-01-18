@@ -7,7 +7,7 @@ import {Database} from './utils/database.js';
 
 //TODO use git lfs or some other non-temporary means of saving this
 // another option: directly pull from Small-Body Database Query (https://ssd.jpl.nasa.gov/tools/sbdb_query.html)
-const DATASET_PATH = "https://github.com/pkomon-tgm/rtvis2023-dataset/raw/main/sbdb_query_results.csv";
+const DATASET_PATH = "https://media.githubusercontent.com/media/pkomon-tgm/rtvis2023-dataset/main/sbdb_query_results.csv";
 const db = new Database();
 await db.initWithCsv(DATASET_PATH);
 
