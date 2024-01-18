@@ -3,7 +3,9 @@ export class VisService {
     defaultSize = 1;
     defaultColor = 0xffffff;
 
-    constructor(db, infoPanel, engine) {
+    particleIndexOffset;
+
+    constructor(db, infoPanel, engine, particleIndexOffset = 0) {
         this.db = db;
         this.selectedSpaceObjects = [];
         this.selectedSpaceObjects.push(db.spaceObjects[0]);
@@ -13,6 +15,7 @@ export class VisService {
         this.entries = this.db.entries;
         this.currentFilers = {};
         this.particleSize = 30;
+        this.particleIndexOffset = particleIndexOffset;
     }
 
     showOnlyPHAs() {
@@ -41,8 +44,8 @@ export class VisService {
 
     highlightFilteredObjects() {
         this.selectedEntries.forEach(entry => {
-            this.engine.renderPipeline.setParticleSize(entry.idx, 300);
-            this.engine.renderPipeline.setParticleColor(entry.idx, [1, 0, 0, 1])
+            this.engine.renderPipeline.setParticleSize(this.particleSize + entry.idx, 300);
+            this.engine.renderPipeline.setParticleColor(this.particleSize + entry.idx, [1, 0, 0, 1])
         });
         if (this.currentFilers.hideComplements) {
             this.hideComplements();
@@ -111,15 +114,15 @@ export class VisService {
 
     resetAll() {
         this.db.entries.forEach(entry => {
-            this.engine.renderPipeline.setParticleSize(entry.idx, (Math.min(Math.max(Math.sqrt(entry.spaceObject.diameter * this.particleSize), 20), 200)));
-            this.engine.renderPipeline.setParticleColor(entry.idx, [1, 1, 1, 1])
+            this.engine.renderPipeline.setParticleSize(this.particleIndexOffset + entry.idx, (Math.min(Math.max(Math.sqrt(entry.spaceObject.diameter * this.particleSize), 20), 200)));
+            this.engine.renderPipeline.setParticleColor(this.particleIndexOffset + entry.idx, [1, 1, 1, 1])
         });
     }
 
     hideComplements() {
         let complementEntries = this.getComplement(this.selectedEntries);
         complementEntries.forEach(entry => {
-            this.engine.renderPipeline.setParticleSize(entry.idx, 0);
+            this.engine.renderPipeline.setParticleSize(this.particleIndexOffset + entry.idx, 0);
         });
     }
 
@@ -127,7 +130,7 @@ export class VisService {
         this.particleSize = size;
         let notSelectedEntries = this.getComplement(this.selectedEntries);
         notSelectedEntries.forEach(entry => {
-            this.engine.renderPipeline.setParticleSize(entry.idx, (Math.min(Math.max(Math.sqrt(entry.spaceObject.diameter * this.particleSize), 20), 200)));
+            this.engine.renderPipeline.setParticleSize(this.particleIndexOffset + entry.idx, (Math.min(Math.max(Math.sqrt(entry.spaceObject.diameter * this.particleSize), 20), 200)));
         });
     }
 
