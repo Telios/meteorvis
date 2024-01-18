@@ -56,7 +56,8 @@ export class Engine {
         if (!this.isPaused) {
 
             this.jd += deltaTime / 1000 * this.jdPerSecond;
-            await this.orbitPipeline.updateMOrA0(this.jd);
+            //await this.orbitPipeline.updateMOrA0(this.jd);
+            await this.orbitPipeline.setAndUpdateJd(this.jd);
             await this.orbitPipeline.runOrbitPipeline();
 
             if (this.onTick !== undefined) {
@@ -67,7 +68,7 @@ export class Engine {
 
         const updateEnd = performance.now();
         const updateTime = updateEnd - updateStart;
-        console.log("update time", updateTime, "ms");
+        //console.log("update time", updateTime, "ms");
 
         //console.log("current jd is ", this.jd);
     }

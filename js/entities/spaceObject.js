@@ -1,4 +1,6 @@
 export class SpaceObject{
+    ephem = undefined;
+
     constructor(full_name, diameter, epoch, e, a, i, ma, om, w, pha, orbit_id, tp, q, neo, n, ad, GM, BV, UB, IR, H, G, condition_code, orbit_class, per_d, per_y) {
         this.full_name = full_name; // name
         this.diameter = diameter; // object diameter (sphere model) in km
@@ -28,8 +30,8 @@ export class SpaceObject{
         this.per_y = per_y; // period in y
     }
 
-    get Ephemeris() {
-        return new Spacekit.Ephem({
+    calcEphemeris() {
+        this.ephem = new Spacekit.Ephem({
             epoch: this.epoch,
             a: this.a,
             e: this.e,
@@ -38,7 +40,15 @@ export class SpaceObject{
             w: this.w,
             ma: this.ma,
             tp: this.tp,
+            n: this.n,
         }, 'deg');
+    }
+
+    get Ephemeris() {
+        if (this.ephem === undefined) {
+            this.calcEphemeris();
+        }
+        return this.ephem;
     }
 
     isPHA() {

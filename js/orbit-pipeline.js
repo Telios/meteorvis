@@ -5,6 +5,8 @@ const SCALE_FACTOR = 1.0;
 // ported to webGPU from spacekit's KeplerParticle shader
 function getOrbitShaderCode() {
     return `
+const PARABOLIC_K = 0.01720209895;
+
 struct Orbit {
     a: f32,
     e: f32,
@@ -14,6 +16,11 @@ struct Orbit {
     M: f32,
     q: f32,
     a0: f32,
+    
+    tp: f32, //used for parabolic
+    epoch: f32, //used for ellipsoid/hyperbolic
+    ma: f32, //used for ellipsoid/hyperbolic
+    n: f32, //used for ellipsoid/hyperbolic
 };
 
 @group(0) @binding(0)
@@ -25,11 +32,12 @@ var<storage, read_write> output: array<vec3<f32>>;
 @group(0) @binding(2)
 var<storage, read> m_or_a0: array<f32>;
 
+@group(0) @binding(3)
+var<uniform> jd: f32;
+
 /**
  * Math helper functions, cosh, tanh and sinh are built-in functions in wgsl
  */
- 
-
 // COSH Function (Hyperbolic Cosine)
 fn cosh(val: f32) -> f32 {
   let tmp = exp(val);
@@ -51,20 +59,38 @@ fn sinh(val: f32) -> f32 {
   return sinH;
 }
 
-
 // Cube root helper that assumes param is positive
 fn cbrt(x: f32) -> f32 {
     return exp(log(x) / 3.0);
 }
 
-fn getPosNearParabolic(global_id: u32) -> vec3<f32> {
+/**
+ * Functions for calculating time-dependent values.
+ */
+fn getA0(tp: f32, e: f32, q: f32, jd: f32) -> f32 {
+    let d = jd - tp;
+    return 0.75 * d * PARABOLIC_K * sqrt((1 + e) / (q * q * q));
+}
+
+fn getM(epoch: f32, n: f32, ma: f32, jd: f32) -> f32 {
+    let d = jd - epoch;
+    return ma + n * d;
+}
+
+/**
+ * Functions for calculating positions for specific orbit types.
+ */
+fn getPosNearParabolic(global_id: u32, jd: f32) -> vec3<f32> {
     let orbit = orbits[global_id];
-    let a0 = m_or_a0[global_id];
     let e = orbit.e;
     let q = orbit.q;
     let i = orbit.i;
     let om = orbit.om;
     let wBar = orbit.wBar;
+
+    //let a0 = m_or_a0[global_id];
+    let tp = orbit.tp;
+    let a0 = getA0(tp, e, q, jd);
 
     // See https://stjarnhimlen.se/comp/ppcomp.html#17
     let b = sqrt(1.0 + a0 * a0);
@@ -94,14 +120,19 @@ fn getPosNearParabolic(global_id: u32) -> vec3<f32> {
     return vec3(X, Y, Z);
 }
 
-fn getPosHyperbolic(global_id: u32) -> vec3<f32> {
+fn getPosHyperbolic(global_id: u32, jd: f32) -> vec3<f32> {
     let orbit = orbits[global_id];
-    let M = m_or_a0[global_id];
     let e = orbit.e;
     let a = orbit.a;
     let i = orbit.i;
     let om = orbit.om;
     let wBar = orbit.wBar;
+    
+    //let M = m_or_a0[global_id];
+    let epoch = orbit.epoch;
+    let n = orbit.n;
+    let ma = orbit.ma;
+    let M = getM(epoch, n, ma, jd);
     
     var F0 = M;
     for (var count = 0; count < 100; count++) {
@@ -128,14 +159,19 @@ fn getPosHyperbolic(global_id: u32) -> vec3<f32> {
     return vec3(X, Y, Z);
 }
 
-fn getPosEllipsoid(global_id: u32) -> vec3<f32> {
+fn getPosEllipsoid(global_id: u32, jd: f32) -> vec3<f32> {
     let orbit = orbits[global_id];
     let i = orbit.i;
     let om = orbit.om;
     let wBar = orbit.wBar;
-    let M = m_or_a0[global_id];
     let e = orbit.e;
     let a = orbit.a;
+    
+    //let M = m_or_a0[global_id];
+    let epoch = orbit.epoch;
+    let n = orbit.n;
+    let ma = orbit.ma;
+    let M = getM(epoch, n, ma, jd);
     
     let i_rad = i;
     let o_rad = om;
@@ -169,14 +205,14 @@ fn getPosEllipsoid(global_id: u32) -> vec3<f32> {
     return vec3(X, Y, Z);
 }
 
-fn getPos(global_id: u32) -> vec3<f32> {
+fn getPos(global_id: u32, jd: f32) -> vec3<f32> {
     let e = orbits[global_id].e;
     if (e > 0.9 && e < 1.2) {
-        return getPosNearParabolic(global_id);
+        return getPosNearParabolic(global_id, jd);
     } else if (e > 1.2) {
-        return getPosHyperbolic(global_id);
+        return getPosHyperbolic(global_id, jd);
     }
-    return getPosEllipsoid(global_id);
+    return getPosEllipsoid(global_id, jd);
 }
 
 @compute @workgroup_size(64)
@@ -186,18 +222,20 @@ fn main(
   if (global_id.x >= ${OrbitPipeline.MAX_NUM_ORBITS}) {
     return;
   }
-
-  output[global_id.x] = getPos(global_id.x);
+  output[global_id.x] = getPos(global_id.x, jd);
 }`;
 }
 
 
 export class OrbitPipeline {
-    static BYTES_PER_ORBIT = 8 * 4; // 8 floats in orbit struct, 4 bytes per float
+    static FLOATS_PER_ORBIT = 12;
+    static BYTES_PER_ORBIT = OrbitPipeline.FLOATS_PER_ORBIT * 4; // 8 floats in orbit struct, 4 bytes per float
     static BYTES_PER_POSITION = 4 * 4; //vec3 has 3 floats, but is aligned to next power of 2 (-> 16)
-    static MAX_NUM_ORBITS = 1000000;
-    static MAX_ORBIT_INPUT_BUFFER_SIZE = OrbitPipeline.MAX_NUM_ORBITS * OrbitPipeline.BYTES_PER_ORBIT;
-    static MAX_ORBIT_OUTPUT_BUFFER_SIZE = OrbitPipeline.MAX_NUM_ORBITS * OrbitPipeline.BYTES_PER_POSITION; // vec3, 4 byte per float
+    static MAX_NUM_ORBITS = 1400000;
+    static MAX_ORBIT_INPUT_BUFFER_SIZE_IN_BYTES = OrbitPipeline.MAX_NUM_ORBITS * OrbitPipeline.BYTES_PER_ORBIT;
+    static MAX_ORBIT_OUTPUT_BUFFER_SIZE_IN_BYTES = OrbitPipeline.MAX_NUM_ORBITS * OrbitPipeline.BYTES_PER_POSITION; // vec3, 4 byte per float
+    static UNIFORM_BUFFER_SIZE_IN_FLOATS = 1;
+    static UNIFORM_BUFFER_SIZE_IN_BYTES = OrbitPipeline.UNIFORM_BUFFER_SIZE_IN_FLOATS * 4;
 
     computeContext = undefined;
 
@@ -206,6 +244,9 @@ export class OrbitPipeline {
     outputBuffer = undefined;
     outputStagingBuffer = undefined;
     mOrA0Buffer = undefined;
+
+    jdBuffer = undefined;
+    jdData = undefined;
 
     pipeline = undefined;
 
@@ -227,19 +268,23 @@ export class OrbitPipeline {
     async initBuffers() {
         // orbit pipeline buffers
         this.inputStagingBuffer = this.computeContext.device.createBuffer({
-            size: OrbitPipeline.MAX_ORBIT_INPUT_BUFFER_SIZE,
+            label: "input staging bfufer for orbit compute shader",
+            size: OrbitPipeline.MAX_ORBIT_INPUT_BUFFER_SIZE_IN_BYTES,
             usage: GPUBufferUsage.MAP_WRITE | GPUBufferUsage.COPY_SRC,
         });
         this.inputBuffer = this.computeContext.device.createBuffer({
-            size: OrbitPipeline.MAX_ORBIT_INPUT_BUFFER_SIZE,
+            label: "input buffer for orbit compute shader",
+            size: OrbitPipeline.MAX_ORBIT_INPUT_BUFFER_SIZE_IN_BYTES,
             usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
         });
         this.outputBuffer = this.computeContext.device.createBuffer({
-            size: OrbitPipeline.MAX_ORBIT_OUTPUT_BUFFER_SIZE,
+            label: "output buffer for orbit compute shader",
+            size: OrbitPipeline.MAX_ORBIT_OUTPUT_BUFFER_SIZE_IN_BYTES,
             usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC,
         });
         this.outputStagingBuffer = this.computeContext.device.createBuffer({
-            size: OrbitPipeline.MAX_ORBIT_OUTPUT_BUFFER_SIZE,
+            label: "output staging buffer for orbit compute shader",
+            size: OrbitPipeline.MAX_ORBIT_OUTPUT_BUFFER_SIZE_IN_BYTES,
             usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST,
         });
         this.mOrA0Buffer = this.computeContext.device.createBuffer({
@@ -249,6 +294,13 @@ export class OrbitPipeline {
         });
         this.mOrA0Data = new Float32Array(OrbitPipeline.MAX_NUM_ORBITS).fill(0);
         this.updateMOrA0Buffer();
+
+        this.jdBuffer = this.computeContext.device.createBuffer({
+            label: "uniform buffer for jd",
+            size: OrbitPipeline.UNIFORM_BUFFER_SIZE_IN_BYTES,
+            usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+        });
+        this.jdData = new Float32Array(OrbitPipeline.UNIFORM_BUFFER_SIZE_IN_FLOATS).fill(0);
     }
 
     async initPipeline() {
@@ -256,6 +308,7 @@ export class OrbitPipeline {
             0: {type: "read-only-storage", buffer: this.inputBuffer},
             1: {type: "storage", buffer: this.outputBuffer},
             2: {type: "read-only-storage", buffer: this.mOrA0Buffer},
+            3: {type: "uniform", buffer: this.jdBuffer},
         };
         this.pipeline = this.computeContext.createComputePipeline(orbitPipelineBindingToBufferInfo, getOrbitShaderCode());
     }
@@ -282,8 +335,8 @@ export class OrbitPipeline {
         const updateMOrA0CpuEnd = performance.now();
         this.updateMOrA0Buffer();
         const updateMOrA0End = performance.now();
-        console.log("update M or A0, CPU ", updateMOrA0CpuEnd - updateMOrA0Start,
-            ", GPU", updateMOrA0End - updateMOrA0CpuEnd);
+        //console.log("update M or A0, CPU ", updateMOrA0CpuEnd - updateMOrA0Start,
+        //    ", GPU", updateMOrA0End - updateMOrA0CpuEnd);
     }
 
     async copyOrbitsArrayToStagingBuffer() {
@@ -296,24 +349,28 @@ export class OrbitPipeline {
         await this.inputStagingBuffer.mapAsync(
             GPUMapMode.WRITE,
             0,
-            OrbitPipeline.MAX_ORBIT_INPUT_BUFFER_SIZE,
+            OrbitPipeline.MAX_ORBIT_INPUT_BUFFER_SIZE_IN_BYTES,
         );
 
-        const stagingBuffer = this.inputStagingBuffer.getMappedRange(0, OrbitPipeline.MAX_ORBIT_INPUT_BUFFER_SIZE);
+        const stagingBuffer = this.inputStagingBuffer.getMappedRange(0, OrbitPipeline.MAX_ORBIT_INPUT_BUFFER_SIZE_IN_BYTES);
 
         const float32Array = new Float32Array(stagingBuffer);
-        let bytesPos = 0;
+        let floatPos = 0;
         for (let i = 0; i < orbits.length; i++) {
             const orbit = orbits[i];
-            float32Array[bytesPos] = orbit.a;
-            float32Array[bytesPos + 1] = orbit.e;
-            float32Array[bytesPos + 2] = orbit.i;
-            float32Array[bytesPos + 3] = orbit.om;
-            float32Array[bytesPos + 4] = orbit.wBar;
-            float32Array[bytesPos + 5] = orbit.M;
-            float32Array[bytesPos + 6] = orbit.q;
-            float32Array[bytesPos + 7] = orbit.a0;
-            bytesPos += 8;
+            float32Array[floatPos] = orbit.a;
+            float32Array[floatPos + 1] = orbit.e;
+            float32Array[floatPos + 2] = orbit.i;
+            float32Array[floatPos + 3] = orbit.om;
+            float32Array[floatPos + 4] = orbit.wBar;
+            float32Array[floatPos + 5] = orbit.M;
+            float32Array[floatPos + 6] = orbit.q;
+            float32Array[floatPos + 7] = orbit.a0;
+            float32Array[floatPos + 8] = orbit.tp;
+            float32Array[floatPos + 9] = orbit.epoch;
+            float32Array[floatPos + 10] = orbit.ma;
+            float32Array[floatPos + 11] = orbit.n;
+            floatPos += OrbitPipeline.FLOATS_PER_ORBIT;
         }
         this.inputStagingBuffer.unmap();
     }
@@ -326,32 +383,49 @@ export class OrbitPipeline {
             0,
             this.inputBuffer,
             0,
-            OrbitPipeline.MAX_ORBIT_INPUT_BUFFER_SIZE,
+            OrbitPipeline.MAX_ORBIT_INPUT_BUFFER_SIZE_IN_BYTES,
         );
 
         this.computeContext.device.queue.submit([commandEncoder.finish()]);
     }
 
+    /**
+     * Sets julian date. This is used for calculating the positions-
+     * @param jd {number} julian date
+     */
+    setJd(jd) {
+        this.jdData.set([jd]);
+    }
+
+    updateJd() {
+        this.computeContext.device.queue.writeBuffer(this.jdBuffer, 0, this.jdData);
+    }
+
+    setAndUpdateJd(jd) {
+        this.setJd(jd);
+        this.updateJd();
+    }
+
     async runOrbitPipeline() {
         this.computeContext.encodeAndSubmitCommands(this.pipeline, Math.ceil(this.orbits.length / 64),
-            this.outputBuffer, this.outputStagingBuffer, this.orbits.length * OrbitPipeline.BYTES_PER_ORBIT);
+            this.outputBuffer, this.outputStagingBuffer, this.orbits.length * OrbitPipeline.BYTES_PER_POSITION);
     }
 
     async readBackOrbitData() {
         await this.outputStagingBuffer.mapAsync(
             GPUMapMode.READ,
             0,
-            OrbitPipeline.MAX_ORBIT_OUTPUT_BUFFER_SIZE,
+            OrbitPipeline.MAX_ORBIT_OUTPUT_BUFFER_SIZE_IN_BYTES,
         );
 
-        const copyArrayBuffer = this.outputStagingBuffer.getMappedRange(0, OrbitPipeline.MAX_ORBIT_OUTPUT_BUFFER_SIZE);
+        const copyArrayBuffer = this.outputStagingBuffer.getMappedRange(0, OrbitPipeline.MAX_ORBIT_OUTPUT_BUFFER_SIZE_IN_BYTES);
         const data = copyArrayBuffer.slice();
         this.outputStagingBuffer.unmap();
         const float32Data = new Float32Array(data);
 
         //TODO this is slow!
         const positionArray = new Array(OrbitPipeline.MAX_NUM_ORBITS).fill(0);
-        for (let i = 0; i < OrbitPipeline.MAX_ORBIT_OUTPUT_BUFFER_SIZE; i += 4) {
+        for (let i = 0; i < OrbitPipeline.MAX_ORBIT_OUTPUT_BUFFER_SIZE_IN_BYTES; i += 4) {
             positionArray[i / 4] = [float32Data[i], float32Data[i + 1], float32Data[i + 2]];
         }
 
@@ -385,6 +459,7 @@ function getM(ephem, jd) {
 export function spaceObjectsToEphemeris(spaceObjects, jd = 123) {
     return spaceObjects.map(spaceObject => spaceObject.Ephemeris)
         .map(ephem => {
+            const isParabolic = Spacekit.Orbit.getOrbitType(ephem) === Spacekit.OrbitType.PARABOLIC;
             return {
                 a: ephem.get("a"),
                 e: ephem.get("e"),
@@ -394,6 +469,10 @@ export function spaceObjectsToEphemeris(spaceObjects, jd = 123) {
                 q: ephem.get("q"),
                 M: 0,
                 a0: 0,
+                tp: isParabolic ? ephem.get("tp") : 0,
+                epoch: isParabolic ? 0 : ephem.get("epoch"),
+                ma: isParabolic ? 0 : ephem.get("ma"),
+                n: isParabolic ? 0 : ephem.get("n"),
             };
         })
         .slice(0, OrbitPipeline.MAX_NUM_ORBITS);

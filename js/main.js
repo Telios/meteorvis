@@ -5,9 +5,11 @@ import {Engine} from "./engine.js"
 import {SpaceObject} from './entities/spaceObject.js';
 import {Database} from './utils/database.js';
 
-const THREE = Spacekit.THREE;
+//TODO use git lfs or some other non-temporary means of saving this
+// another option: directly pull from Small-Body Database Query (https://ssd.jpl.nasa.gov/tools/sbdb_query.html)
+const DATASET_PATH = "https://github.com/pkomon-tgm/rtvis2023-dataset/raw/main/sbdb_query_results.csv";
 const db = new Database();
-await db.init();
+await db.initWithCsv(DATASET_PATH);
 
 function getSpaceObjectsForSunAndPlanets() {
 
@@ -15,11 +17,11 @@ function getSpaceObjectsForSunAndPlanets() {
     sun.full_name = "Sun";
     sun.epoch = 0;
     sun.a = 0;
-    sun.e = 1;
-    sun.i = 1;
-    sun.om = 1;
-    sun.w = 1;
-    sun.ma = 1;
+    sun.e = 0;
+    sun.i = 0;
+    sun.om = 0;
+    sun.w = 0;
+    sun.ma = 0;
     sun.diameter = 1391400;
 
     const mercury = new SpaceObject();
