@@ -1,6 +1,6 @@
 # MeteorVis
 
-... where we actually visualizinge asteroids (mainly).
+... where we are actually visualizing asteroids.
 
 MeteorVis is a web-based client-side interactive 3D visualization of asteroids traversing their orbits over time.
 
@@ -30,4 +30,4 @@ Packages we also used were
  - [julian](https://github.com/stevebest/julian) for conversions from and to [Julian Date](https://en.wikipedia.org/wiki/Julian_day), which is a common date format in astronomy
  - [spacekit.js](https://typpo.github.io/spacekit/) for precalculating some orbit parameters that do not change over time, which are subsequently used in the shader (class Ephemeris)
  - [dat.GUI](https://github.com/dataarts/dat.gui) for IMGUI-style control panel at the top right
- - [Bootstrap 5 Icon](https://icons.getbootstrap.com/) for play button icon
+ - [Bootstrap 5 Icon](https://icons.getbootstrap.com/) for play button icon and spinner for loading
