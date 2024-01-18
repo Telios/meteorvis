@@ -35,6 +35,11 @@
             margin: auto;
         }
 
+        .bottomBarColors {
+            background: rgba(0, 0, 0, 60%);
+            color: white;
+        }
+
         #bottomBar {
             position: absolute;
             left: 0;
@@ -43,7 +48,7 @@
             height: 100px;
             width: 100%;
 
-            display: flex;
+            display: grid;
             grid-template-columns: 1fr 1fr 1fr;
 
             flex-direction: row;
@@ -51,15 +56,20 @@
             justify-content: start;
             column-gap: 8px;
 
-            background: rgba(255, 255, 255, 20%);
+            pointer-events: none;
         }
 
         #bottomBar>div {
             margin-left: 16px;
         }
 
-        #bottomBar {
-            color: white;
+        #bottomBarCenter {
+            display: flex;
+            flex-direction: row;
+            align-items: center;
+            justify-content: center;
+            column-gap: 8px;
+            row-gap: 8px;
         }
 
         /*icon size*/
@@ -91,26 +101,72 @@
         .custom-ls {
             margin-bottom: 0.5em;
         }
+
+        #perfDisplay {
+            flex-direction: column;
+            align-items: end;
+            justify-items: end;
+            justify-content: end;
+            padding: 2px;
+        }
+
+        #pauseButton {
+            pointer-events: all;
+        }
+
+        #bottomBarInner {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: start;
+            column-gap: 8px;
+            row-gap: 8px;
+            padding: 8px;
+        }
+
+        #bottomBarRight {
+            display: flex;
+            flex-direction: row;
+            align-items: end;
+            justify-content: end;
+            height: 100px;
+        }
+
+        #spinner {
+            position: absolute;
+            left: 50%;
+            top: 50%;
+            margin-top: -50px;
+            margin-left: -50px;
+            width: 100px;
+            height: 100px;
+        }
     </style>
 </head>
 <body>
+    <div id="spinner" class="spinner-border" role="status">
+    </div>
+
     <canvas id="mainContainer"></canvas>
     <div id="bottomBar">
-        <div id="playbackControls">
-            <div class="btn-group" role="group" aria-label="Basic example">
-                <button id="decrSpeedButton" type="button" class="btn btn-primary"><i class="bi bi-rewind-fill"></i></button>
-                <button id="pauseButton" type="button" class="btn btn-primary"><i class="bi bi-pause-fill"></i></button>
-                <button id="incrSpeedButton" type="button" class="btn btn-primary"><i class="bi bi-fast-forward-fill"></i></button>
+        <div></div>
+        <div id="bottomBarCenter">
+            <div id="bottomBarInner" class="bottomBarColors">
+                <div id="timeDisplay">
+                    JD: <span id="timeDisplayJd"></span> | UTC: <span id="timeDisplayGregorian"></span>
+                </div>
+                <div id="playbackControls">
+                    <div class="btn-group" role="group" aria-label="Basic example">
+                        <button id="pauseButton" type="button" class="btn btn-primary"><i class="bi bi-pause-fill"></i></button>
+                    </div>
+                </div>
             </div>
         </div>
-        <div id="timeDisplay">
-            <div>Simulation speed: <span id="timeDisplayDaysPerSecond"></span> day(s) / s</div>
-            <div>JD: <span id="timeDisplayJd"></span></div>
-            <div>UTC: <span id="timeDisplayGregorian"></span></div>
-        </div>
-        <div id="perfDisplay">
-            <div>FPS: <span id="perfDisplayFps"></span></div>
-            <div>Frame time: <span id="perfDisplayFrameTime"></span>ms</div>
+        <div id="bottomBarRight">
+            <div id="perfDisplay" class="bottomBarColors">
+                <div><span id="perfDisplayFps"></span> FPS</div>
+                <div><span id="perfDisplayFrameTime"></span>ms per frame</div>
+            </div>
         </div>
     </div>
     <script src="js/utility.js" type="module"></script>

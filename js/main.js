@@ -159,6 +159,7 @@ async function main() {
     const visService = new VisService(db, infoPanel, engine, objects.length);
     visService.resetAll();
     visService.updateInfoPanel();
+    infoPanel.close();
     gui.speedController.onChange((value) => {
         engine.setJdPerSecond(value);
     });
@@ -197,18 +198,18 @@ async function main() {
     }
 
     document.getElementById("pauseButton").addEventListener("click", toggleSimulationPause);
-    document.getElementById("incrSpeedButton").addEventListener("click", () => {
+    /*document.getElementById("incrSpeedButton").addEventListener("click", () => {
         engine.setJdPerSecond(engine.getJdPerSecond() + 1);
     });
     document.getElementById("decrSpeedButton").addEventListener("click", () => {
         engine.setJdPerSecond(engine.getJdPerSecond() - 1);
-    });
+    });*/
 
 
     function updateTimeDisplay() {
         // duration of a gregorian day is the same as julian day, can just use jd per seconds
-        const speedDisplay = document.getElementById("timeDisplayDaysPerSecond");
-        speedDisplay.innerHTML = engine.getJdPerSecond();
+        //const speedDisplay = document.getElementById("timeDisplayDaysPerSecond");
+        //speedDisplay.innerHTML = engine.getJdPerSecond().toFixed(0);
 
         const timeDisplayJd = document.getElementById("timeDisplayJd");
         timeDisplayJd.innerHTML = engine.getJd().toFixed(4);
@@ -267,6 +268,7 @@ async function main() {
     await engine.webGpuContext.device.queue.onSubmittedWorkDone(); //wait until current queue is done
     const uploadEndTime = performance.now();
     console.log("...done in ", (uploadEndTime - uploadStartTime), "ms");
+    document.getElementById("spinner").remove();
 
     objects.forEach((obj, i) => {
         engine.renderPipeline.setParticleSize(i, Math.min(Math.sqrt(obj.diameter * visService.particleSize), 1000));
