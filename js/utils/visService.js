@@ -8,7 +8,6 @@ export class VisService {
     constructor(db, infoPanel, engine, particleIndexOffset = 0) {
         this.db = db;
         this.selectedSpaceObjects = [];
-        this.selectedSpaceObjects.push(db.spaceObjects[0]);
         this.infoPanel = infoPanel;
         this.engine = engine;
         this.selectedEntries = [];
@@ -18,34 +17,10 @@ export class VisService {
         this.particleIndexOffset = particleIndexOffset;
     }
 
-    showOnlyPHAs() {
-        this.selectedSpaceObjects = this.db.getPHAs();
-    }
-
-    showOnlyNEOs() {
-        this.selectedSpaceObjects = this.selectedSpaceObjects.filter(so => so.isNEO());
-    }
-
-    showSelectedSpaceObjectDetails() {
-        // TODO
-    }
-
-    showSelectedSpaceObjectOrbit() {
-        // TODO
-    }
-
-    changeSelectedSpaceObjectsSize() {
-        // TODO
-    }
-
-    changeSelectedSpaceObjectsColor() {
-        // TODO
-    }
-
     highlightFilteredObjects() {
         this.selectedEntries.forEach(entry => {
-            this.engine.renderPipeline.setParticleSize(this.particleSize + entry.idx, 300);
-            this.engine.renderPipeline.setParticleColor(this.particleSize + entry.idx, [1, 0, 0, 1])
+            this.engine.renderPipeline.setParticleSize(this.particleIndexOffset + entry.idx, 300);
+            this.engine.renderPipeline.setParticleColor(this.particleIndexOffset + entry.idx, [1, 0, 0, 1])
         });
         if (this.currentFilers.hideComplements) {
             this.hideComplements();
@@ -108,7 +83,12 @@ export class VisService {
         let end = new Date();
         let time = end.getTime() - now.getTime();
         console.log('Filtering execution time: ' + time);
-        this.highlightFilteredObjects();
+        if ((this.currentFilers.objectClass === "All" || this.currentFilers.objectClass === undefined) && (this.currentFilers.name === "" || this.currentFilers.name === undefined) && (this.currentFilers.minSpeed === 0 || this.currentFilers.minSpeed === undefined) && (this.currentFilers.minDiameter === 0 || this.currentFilers.minDiameter === undefined)) {
+            console.log("Resetting");
+            this.resetAll();
+        } else {
+            this.highlightFilteredObjects();
+        }
     }
 
 

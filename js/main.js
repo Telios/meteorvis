@@ -158,7 +158,7 @@ async function main() {
     const infoPanel = gui.infoPanel();
     const visService = new VisService(db, infoPanel, engine, objects.length);
     visService.resetAll();
-    visService.updateInfoPanel();
+    //visService.updateInfoPanel();
     infoPanel.close();
     gui.speedController.onChange((value) => {
         engine.setJdPerSecond(value);
