@@ -44,8 +44,8 @@ export class VisService {
 
     highlightFilteredObjects() {
         this.selectedEntries.forEach(entry => {
-            this.engine.renderPipeline.setParticleSize(this.particleSize + entry.idx, 300);
-            this.engine.renderPipeline.setParticleColor(this.particleSize + entry.idx, [1, 0, 0, 1])
+            this.engine.renderPipeline.setParticleSize(this.particleIndexOffset + entry.idx, 300);
+            this.engine.renderPipeline.setParticleColor(this.particleIndexOffset + entry.idx, [1, 0, 0, 1])
         });
         if (this.currentFilers.hideComplements) {
             this.hideComplements();
