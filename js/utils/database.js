@@ -1,4 +1,32 @@
 import {Entry, SpaceObject} from "../entities/spaceObject.js";
+
+async function fetchWithProgress(url, progressCallback) {
+    const response = await fetch(url);
+    const contentLength = +response.headers.get("Content-Length");
+    const reader = response.body.getReader();
+
+    let data = new Uint8Array(contentLength);
+    let position = 0;
+
+    while (true) {
+        const {done, value} = await reader.read();
+
+        if (done) {
+            break;
+        }
+
+        progressCallback(position / contentLength);
+
+        data.set(value, position);
+        position += value.length;
+    }
+
+    if (position !== contentLength) {
+        console.log("warning: received less bytes than ContentLength");
+    }
+    return new TextDecoder("utf-8").decode(data);
+}
+
 export class Database{
     static NUMBERS = ["diameter", "epoch", "e", "a", "i", "ma", "om", "w", "tp", "q", "n", "per_d", "per_y"];
 
@@ -8,10 +36,9 @@ export class Database{
         this.entries = [];
     }
 
-    async initWithCsv(path = "./data/sbdb_query_results.csv") {
-        const csvResponse = await fetch(path);
-        const content = await csvResponse.text();
+    parseSync(content) {
         const lines = content.split("\n");
+        const numLines = lines.length;
         const header = lines[0].replaceAll("\"", "").split(",");
         const isNumber = header.map(colHeader => Database.NUMBERS.includes(colHeader));
         console.log("header: ", header, ", is number: ", isNumber);
@@ -21,12 +48,11 @@ export class Database{
             const spaceObject = new SpaceObject();
             for (let colIndex = 0; colIndex < header.length; colIndex++) {
                 const colName = header[colIndex];
-                const colValue = isNumber[colIndex] ? +row[colIndex] : row[colIndex];
-                spaceObject[colName] = colValue;
+                spaceObject[colName] = isNumber[colIndex] ? +row[colIndex] : row[colIndex];
             }
 
             try {
-                const x = spaceObject.Ephemeris;
+                spaceObject.calcEphemeris();
             } catch (error) {
                 console.warn("row ", row, "produced error ", error, "SKIP");
                 continue;
@@ -36,7 +62,32 @@ export class Database{
             this.entries.push(new Entry(numAdded, spaceObject));
             numAdded++;
         }
-        console.log("read ", lines.length, " lines");
+    }
+
+    // TODO do parsing in a way that does not block event processing/UI updates
+    async initWithCsv(path = "./data/sbdb_query_results.csv", callbacks) {
+
+        const {onDownloadProgress, onParseProgress, onDownloadFinished, onParseFinished} = callbacks;
+
+        const loadStart = performance.now();
+        const content = await fetchWithProgress(path, onDownloadProgress);
+        const loadEnd = performance.now();
+
+        if (onDownloadFinished !== undefined){
+            onDownloadFinished();
+        }
+
+        const parseStart = performance.now();
+        this.parseSync(content);
+        const parseEnd = performance.now();
+
+        if (onParseFinished !== undefined) {
+            onParseFinished();
+        }
+
+        console.log("DONE with loading and parsing data",
+            "\nload took", (loadEnd - loadStart) / 1000, "s",
+            "\nparse took", (parseEnd - parseStart) / 1000, "s");
     }
 
     async init() {

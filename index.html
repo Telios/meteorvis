@@ -141,9 +141,29 @@
             width: 100px;
             height: 100px;
         }
+
+        #progress-div {
+            position: absolute;
+            width: 300px;
+            border: solid black;
+            border-radius: 0 0 10px 0;
+            padding: 20px 25px;
+        }
+        #progress-bar {
+            width: 100%;
+        }
+        #progress-label {
+            width: 100%;
+            text-align: center;
+        }
     </style>
 </head>
 <body>
+    <div id="progress-div">
+        <div id="progress-label">Downloading data...</div>
+        <progress id="progress-bar" max="1" value="0"></progress>
+    </div>
+
     <div id="spinner" class="spinner-border" role="status">
     </div>
 

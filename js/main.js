@@ -9,6 +9,27 @@ import {Database} from './utils/database.js';
 // another option: directly pull from Small-Body Database Query (https://ssd.jpl.nasa.gov/tools/sbdb_query.html)
 const DATASET_PATH = "https://media.githubusercontent.com/media/pkomon-tgm/rtvis2023-dataset/main/sbdb_query_results.csv";
 
+async function loadDatabase() {
+    const progressElement = document.getElementById("progress-bar");
+    const labelElement = document.getElementById("progress-label");
+    progressElement.value = 0;
+    labelElement.innerHTML = "Downloading dataset ...";
+
+    const db = new Database();
+
+    await db.initWithCsv(DATASET_PATH, {
+        onDownloadProgress: (progress) => {
+            progressElement.value = progress;
+        },
+        onDownloadFinished: () => {
+            labelElement.innerHTML = "Parsing and preprocessing ...";
+            progressElement.removeAttribute("value");
+        },
+    });
+
+    return db;
+}
+
 function getSpaceObjectsForSunAndPlanets() {
 
     const sun = new SpaceObject();
@@ -114,8 +135,7 @@ function getSpaceObjectsForSunAndPlanets() {
 }
 
 async function main() {
-    const db = new Database();
-    await db.initWithCsv(DATASET_PATH);
+    const db = await loadDatabase();
 
     const objects = getSpaceObjectsForSunAndPlanets();
     const objectColors = {
